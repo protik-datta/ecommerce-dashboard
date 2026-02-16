@@ -18,7 +18,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Outlet } from "react-router-dom";
 
 const Page = () => {
   return (
@@ -53,6 +52,7 @@ const Page = () => {
           </div>
         </header>
       </SidebarInset>
+      
     </SidebarProvider>
   );
 };

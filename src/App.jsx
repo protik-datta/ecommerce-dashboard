@@ -1,16 +1,16 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "./page/dashboard";
 import AddCategory from "./page/AddCategory";
 import ProductList from "./page/ProductList";
-import DashboardLayout from "./layout/DashboardLayout";
+import Page from "./page/dashboard";
+import ThemeToggle from "./components/theme-toggle";
+import DashboardLayout from "./layout/DashLayout";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<DashboardLayout />}>
-          <Route index element={<Dashboard />} />
           <Route path="add-category" element={<AddCategory />} />
           <Route path="product-list" element={<ProductList />} />
           <Route
@@ -25,6 +25,7 @@ export default function App() {
           />
         </Route>
       </Routes>
+      <ThemeToggle />
     </BrowserRouter>
   );
 }
