@@ -18,13 +18,13 @@ function DashboardLayout() {
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className=""/>
+              <SidebarTrigger className="" />
             </div>
           </header>
         </SidebarInset>
 
         {/* Main content */}
-        <main className="mt-15 flex-wrap pr-1">
+        <main className="mt-15 flex-wrap pr-1 w-full ">
           <Outlet />
         </main>
 
