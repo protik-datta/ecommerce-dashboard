@@ -1,19 +1,20 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AddCategory from "./page/AddCategory";
-import ProductList from "./page/ProductList";
+
 import Page from "./page/dashboard";
 import ThemeToggle from "./components/theme-toggle";
 import DashboardLayout from "./layout/DashLayout";
+import CategoryTable from "./page/CategoryList";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<DashboardLayout />}>
-          <Route path="/home" element={<Page />}/>
+          <Route path="/home" element={<Page />} />
           <Route path="add-category" element={<AddCategory />} />
-          <Route path="category-list" element={<ProductList />} />
+          <Route path="category-list" element={<CategoryTable />} />
           <Route
             path="*"
             element={
