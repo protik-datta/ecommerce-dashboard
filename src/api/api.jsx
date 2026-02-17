@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 const api = axios.create({
-  baseURL: "http://localhost:3000/api/v1",
+  baseURL: "https://furniturebackend-0hrb.onrender.com/api/v1",
 });
 
 // create category
@@ -50,3 +50,18 @@ export const deleteCategory = () => {
     },
   });
 };
+
+// add product
+export const createProduct = ()=>{
+  return useMutation({
+    mutationFn : (data)=>{
+      return api.post("/product/create-product",data);
+    },
+    onSuccess : (data)=>{
+      console.log(data);
+    },
+    onError : (error)=>{
+      console.log(error);
+    }
+  })
+}

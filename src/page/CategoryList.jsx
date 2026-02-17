@@ -1,5 +1,6 @@
 import { deleteCategory, getCategory } from "@/api/api";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -8,6 +9,8 @@ const CategoryTable = () => {
   const categoryDeleteMutation = deleteCategory();
 
   const categories = data?.data?.data || [];
+
+  const navigate = useNavigate();
 
   const handleEdit = (cat) => {
     toast.info(`Edit: ${cat.name}`);
@@ -38,7 +41,7 @@ const CategoryTable = () => {
           </div>
 
           <button
-            onClick={() => toast("Create new category page open korba ekhane")}
+            onClick={() => navigate("/add-category")}
             className="px-4 py-2 rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
             Add Category

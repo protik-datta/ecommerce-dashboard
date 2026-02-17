@@ -81,8 +81,8 @@ const AddCategory = () => {
   };
 
   return (
-    <div className="w-full min-h-screen flex justify-start items-start ">
-      <div className="w-full  rounded-2xl shadow-xl p-8">
+    <div className="w-full min-h-screen flex justify-start items-start max-w-4xl">
+      <div className="w-full rounded-2xl shadow-xl p-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white">

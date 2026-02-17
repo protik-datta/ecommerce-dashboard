@@ -11,6 +11,7 @@ import {
   Settings2,
   LayoutGrid,
   Home,
+  Box,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -58,7 +59,7 @@ const data = {
       items: [{ title: "Home", url: "/home" }],
     },
     {
-      title: "Category",
+      title: "Category Management",
       url: "#",
       icon: LayoutGrid,
       isActive: true,
@@ -71,13 +72,13 @@ const data = {
     {
       title: "Product Management",
       url: "#",
-      icon: LayoutGrid,
+      icon: Box,
       isActive: true,
       items: [
-        { title: "Add Product", url: "/add-category" },
-        { title: "Product List", url: "/category-list" },
-        { title: "Upload Product Image", url: "/category-list" },
-        { title: "Delete Product Image", url: "/category-list" },
+        { title: "Add Product", url: "/add-product" },
+        { title: "Product List", url: "/product-list" },
+        { title: "Upload Product Image", url: "/upload-image" },
+        { title: "Delete Product Image", url: "/delete-image" },
       ],
     },
     {
