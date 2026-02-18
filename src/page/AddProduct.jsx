@@ -1,6 +1,7 @@
 import { createProduct, getCategory } from "@/api/api";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
+import { toast, ToastContainer } from "react-toastify";
 
 const AddProduct = () => {
   // api function
@@ -33,7 +34,6 @@ const AddProduct = () => {
   });
 
   //   error
-
   const [error, setErrors] = useState({});
 
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -70,7 +70,7 @@ const AddProduct = () => {
     // validation
     const newErrors = {};
 
-    // Convert color & size to array at submit time
+    // Convert color & size to array
     const colorsArray = formData.color
       .split(",")
       .map((v) => v.trim())
@@ -81,6 +81,7 @@ const AddProduct = () => {
       .map((v) => v.trim())
       .filter(Boolean);
 
+    // validation rules
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.brand.trim()) newErrors.brand = "Brand is required";
     if (!formData.sku.trim()) newErrors.sku = "SKU is required";
@@ -129,7 +130,7 @@ const AddProduct = () => {
     payload.append("sku", formData.sku.trim());
     payload.append("shortDescription", formData.shortDescription.trim());
     payload.append("description", formData.description.trim());
-    payload.append("category", formData.category.trim());
+    payload.append("category", formData.category);
     payload.append("price", Number(formData.price));
     payload.append("discountType", formData.discountType);
 
@@ -143,12 +144,12 @@ const AddProduct = () => {
       payload.append("totalReviews", Number(formData.totalReviews));
     }
 
-    payload.append("isNew", formData.isNew ? "true" : "false");
-    payload.append("isSale", formData.isSale ? "true" : "false");
-    payload.append("isLimited", formData.isLimited ? "true" : "false");
-    payload.append("isHot", formData.isHot ? "true" : "false");
-    payload.append("isFeatured", formData.isFeatured ? "true" : "false");
-    payload.append("isBestSelling", formData.isBestSelling ? "true" : "false");
+    payload.append("isNew", formData.isNew ? true : false);
+    payload.append("isSale", formData.isSale ? true : false);
+    payload.append("isLimited", formData.isLimited ? true : false);
+    payload.append("isHot", formData.isHot ? true : false);
+    payload.append("isFeatured", formData.isFeatured ? true : false);
+    payload.append("isBestSelling", formData.isBestSelling ? true : false);
 
     colorsArray.forEach((color) => payload.append("color[]", color));
     sizesArray.forEach((size) => payload.append("size[]", size));
@@ -157,6 +158,8 @@ const AddProduct = () => {
     productMutate.mutate(payload, {
       onSuccess: (data) => {
         console.log("API Success:", data);
+
+        toast.success("Product created successfully!");
 
         setFormData({
           name: "",
@@ -188,11 +191,21 @@ const AddProduct = () => {
       },
     });
 
-    console.log("Submitting product:", formData);
+    console.log("Submitting product:", payload);
   };
 
   return (
     <div className="min-h-screen w-full flex justify-center items-start py-5 pr-5">
+      {/* ToastContainer */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="dark"
+      />
       <div className="w-full max-w-5xl backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl p-10">
         {/* Header */}
         <div className="mb-10 text-center">
@@ -258,7 +271,7 @@ const AddProduct = () => {
                 </option>
 
                 {categoryData?.data?.data?.map((cat, index) => (
-                  <option key={index} value={cat._id}>
+                  <option key={index} value={cat.id}>
                     {cat.name}
                   </option>
                 ))}

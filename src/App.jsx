@@ -9,6 +9,7 @@ import CategoryTable from "./page/CategoryList";
 import AddProduct from "./page/AddProduct";
 import ProductList from "./page/ProductList";
 import OrderList from "./page/OrderList";
+import EditProduct from "./page/EditProduct";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="add-product" element={<AddProduct />} />
           <Route path="product-list" element={<ProductList />} />
           <Route path="order-list" element={<OrderList />} />
+          <Route path="edit-product" element={<EditProduct />} />
           <Route
             path="*"
             element={

@@ -1,14 +1,14 @@
 import { createCategory } from "@/api/api";
 import React, { useMemo, useState } from "react";
+import { toast, ToastContainer } from "react-toastify";
 
 const AddCategory = () => {
-  // assuming createCategory() returns a mutation object
   const categoryMutate = createCategory();
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    image: null, // File | null
+    image: null,
   });
 
   const [errors, setErrors] = useState({});
@@ -76,12 +76,23 @@ const AddCategory = () => {
         // reset
         setFormData({ name: "", description: "", image: null });
         setErrors({});
+        toast.success("Category created successfully");
       },
     });
   };
 
   return (
     <div className="min-h-screen w-full flex justify-center items-center px-4">
+      {/* ToastContainer */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="dark"
+      />
       <div className="w-full max-w-5xl backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl p-10">
         {/* Header */}
         <div className="mb-10 text-center">
