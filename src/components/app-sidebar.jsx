@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   Home,
   Box,
+  PenLine,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -84,9 +85,9 @@ const data = {
     {
       title: "Order Management",
       url: "#",
-      icon: LayoutGrid,
+      icon: PenLine,
       isActive: true,
-      items: [{ title: "Order List", url: "/category-list" }],
+      items: [{ title: "Order List", url: "/order-list" }],
     },
   ],
 };

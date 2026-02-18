@@ -10,25 +10,24 @@ import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 function DashboardLayout() {
   return (
     <SidebarProvider>
-      <div className="flex h-screen">
+      <div className="flex h-screen w-full">
         {/* Sidebar */}
         <AppSidebar />
 
-        {/* toggle button */}
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-            <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="" />
-            </div>
+        {/* Content Area */}
+        <SidebarInset className="flex flex-col flex-1">
+          {/* Header */}
+          <header className="flex h-16 shrink-0 items-center gap-2 px-4">
+            <SidebarTrigger />
           </header>
+
+          {/* Main content */}
+          <main className="flex-1 overflow-auto pl-5">
+            <Outlet />
+          </main>
         </SidebarInset>
 
-        {/* Main content */}
-        <main className="mt-15 flex-wrap pr-1 w-full ">
-          <Outlet />
-        </main>
-
-        {/* Theme Toggle (fixed on top right) */}
+        {/* Theme Toggle */}
         <ThemeToggle className="fixed top-4 right-4 z-50" />
       </div>
     </SidebarProvider>

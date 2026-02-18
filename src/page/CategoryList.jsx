@@ -7,7 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 const CategoryTable = () => {
   const { data, isPending, isError } = getCategory();
   const categoryDeleteMutation = deleteCategory();
-
+  
   const categories = data?.data?.data || [];
 
   const navigate = useNavigate();

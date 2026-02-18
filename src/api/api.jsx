@@ -52,15 +52,54 @@ export const deleteCategory = () => {
 };
 
 // add product
-export const createProduct = ()=>{
+export const createProduct = () => {
   return useMutation({
-    mutationFn : (data)=>{
-      return api.post("/product/create-product",data);
+    mutationFn: (data) => {
+      return api.post("/product/create-product", data);
     },
-    onSuccess : (data)=>{
+    onSuccess: (data) => {
       console.log(data);
     },
-    onError : (error)=>{
+    onError: (error) => {
+      console.log(error);
+    },
+  });
+};
+
+// get products
+export const getProducts = () => {
+  return useQuery({
+    queryKey: ["products"],
+    queryFn: () => {
+      return api.get("/product/get-products");
+    },
+  });
+};
+
+// order list
+export const getOrders = () => {
+  return useQuery({
+    queryKey: ['orders'],
+    queryFn: () => {
+      return api.get("/order/get-orders");
+    }
+  })
+}
+
+// delete order
+export const deleteOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (invID) => {
+      return api.delete(`/order/delete-order/${invID}`);
+    },
+    onSuccess: (data) => {
+      console.log(data);
+      queryClient.invalidateQueries({
+        queryKey: ['orders']
+      })
+    },
+    onError: (error) => {
       console.log(error);
     }
   })

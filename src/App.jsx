@@ -8,6 +8,7 @@ import DashboardLayout from "./layout/DashLayout";
 import CategoryTable from "./page/CategoryList";
 import AddProduct from "./page/AddProduct";
 import ProductList from "./page/ProductList";
+import OrderList from "./page/OrderList";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="category-list" element={<CategoryTable />} />
           <Route path="add-product" element={<AddProduct />} />
           <Route path="product-list" element={<ProductList />} />
+          <Route path="order-list" element={<OrderList />} />
           <Route
             path="*"
             element={

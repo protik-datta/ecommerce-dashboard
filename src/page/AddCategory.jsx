@@ -69,7 +69,7 @@ const AddCategory = () => {
     const payload = new FormData();
     payload.append("name", formData.name.trim());
     payload.append("description", formData.description.trim());
-    payload.append("image", formData.image); // File
+    payload.append("image", formData.image);
 
     categoryMutate.mutate(payload, {
       onSuccess: () => {
@@ -81,7 +81,7 @@ const AddCategory = () => {
   };
 
   return (
-    <div className="w-full min-h-screen flex justify-start items-start max-w-4xl">
+    <div className="w-full min-h-screen flex justify-center items-start max-w-4xl">
       <div className="w-full rounded-2xl shadow-xl p-8">
         {/* Header */}
         <div className="mb-8">

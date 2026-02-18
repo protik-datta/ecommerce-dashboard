@@ -1,9 +1,12 @@
-import { createProduct } from "@/api/api";
+import { createProduct , getCategory } from "@/api/api";
 import React, { useState } from "react";
 
 const AddProduct = () => {
   // api function
   const productMutate = createProduct();
+
+  // fetch categories for dropdown
+  const { data: categoryData, isLoading: categoryLoading } = getCategory();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -25,7 +28,7 @@ const AddProduct = () => {
     isBestSelling: false,
     color: "",
     size: "",
-    images: [],
+    image: [],
   });
 
   //   error
@@ -52,7 +55,7 @@ const AddProduct = () => {
 
     setFormData((prev) => ({
       ...prev,
-      images: files,
+      image: files,
     }));
 
     const previewUrls = files.map((file) => URL.createObjectURL(file));
@@ -109,336 +112,345 @@ const AddProduct = () => {
 
     if (!sizesArray.length) newErrors.size = "Add at least one size";
 
-    if (!formData.images.length)
-      newErrors.images = "At least one image is required";
+    if (!formData.image.length)
+      newErrors.image = "At least one image is required";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    const payload = new FormData();
+    // payload
+    // const payload = new FormData();
 
-    payload.append("name", formData.name.trim());
-    payload.append("brand", formData.brand.trim());
-    payload.append("sku", formData.sku.trim());
-    payload.append("shortDescription", formData.shortDescription.trim());
-    payload.append("description", formData.description.trim());
-    payload.append("category", formData.category.trim());
-    payload.append("price", Number(formData.price));
-    payload.append("discountType", formData.discountType);
+    // payload.append("name", formData.name.trim());
+    // payload.append("brand", formData.brand.trim());
+    // payload.append("sku", formData.sku.trim());
+    // payload.append("shortDescription", formData.shortDescription.trim());
+    // payload.append("description", formData.description.trim());
+    // payload.append("category", formData.category.trim());
+    // payload.append("price", Number(formData.price));
+    // payload.append("discountType", formData.discountType);
 
-    if (formData.discountValue) {
-      payload.append("discountValue", Number(formData.discountValue));
-    }
+    // if (formData.discountValue) {
+    //   payload.append("discountValue", Number(formData.discountValue));
+    // }
 
-    payload.append("stock", Number(formData.stock));
+    // payload.append("stock", Number(formData.stock));
 
-    if (formData.totalReviews) {
-      payload.append("totalReviews", Number(formData.totalReviews));
-    }
+    // if (formData.totalReviews) {
+    //   payload.append("totalReviews", Number(formData.totalReviews));
+    // }
 
-    payload.append("isNew", formData.isNew ? "true" : "false");
-    payload.append("isSale", formData.isSale ? "true" : "false");
-    payload.append("isLimited", formData.isLimited ? "true" : "false");
-    payload.append("isHot", formData.isHot ? "true" : "false");
-    payload.append("isFeatured", formData.isFeatured ? "true" : "false");
-    payload.append("isBestSelling", formData.isBestSelling ? "true" : "false");
+    // payload.append("isNew", formData.isNew ? "true" : "false");
+    // payload.append("isSale", formData.isSale ? "true" : "false");
+    // payload.append("isLimited", formData.isLimited ? "true" : "false");
+    // payload.append("isHot", formData.isHot ? "true" : "false");
+    // payload.append("isFeatured", formData.isFeatured ? "true" : "false");
+    // payload.append("isBestSelling", formData.isBestSelling ? "true" : "false");
 
-    colorsArray.forEach((color) => payload.append("color[]", color));
-    sizesArray.forEach((size) => payload.append("size[]", size));
-    formData.images.forEach((image) => payload.append("images[]", image));
+    // colorsArray.forEach((color) => payload.append("color[]", color));
+    // sizesArray.forEach((size) => payload.append("size[]", size));
+    // formData.image.forEach((image) => payload.append("image", image));
 
-    productMutate.mutate(payload, {
-      onSuccess: (data) => {
-        console.log("API Success:", data);
+    // productMutate.mutate(payload, {
+    //   onSuccess: (data) => {
+    //     console.log("API Success:", data);
 
-        setFormData({
-          name: "",
-          brand: "",
-          sku: "",
-          shortDescription: "",
-          description: "",
-          category: "",
-          price: "",
-          discountType: "fixed",
-          discountValue: "",
-          stock: "",
-          totalReviews: "",
-          isNew: false,
-          isSale: false,
-          isLimited: false,
-          isHot: false,
-          isFeatured: false,
-          isBestSelling: false,
-          color: "",
-          size: "",
-          images: [],
-        });
+    //     setFormData({
+    //       name: "",
+    //       brand: "",
+    //       sku: "",
+    //       shortDescription: "",
+    //       description: "",
+    //       category: "",
+    //       price: "",
+    //       discountType: "fixed",
+    //       discountValue: "",
+    //       stock: "",
+    //       totalReviews: "",
+    //       isNew: false,
+    //       isSale: false,
+    //       isLimited: false,
+    //       isHot: false,
+    //       isFeatured: false,
+    //       isBestSelling: false,
+    //       color: "",
+    //       size: "",
+    //       image: [],
+    //     });
 
-        setImagePreviews([]);
-      },
-      onError: (error) => {
-        console.log("API Error:", error);
-      },
-    });
+    //     setImagePreviews([]);
+    //   },
+    //   onError: (error) => {
+    //     console.log("API Error:", error);
+    //   },
+    // });
 
-
-    console.log("Submitting product:", payload);
+    console.log("Submitting product:", formData);
   };
 
   return (
-    <div className="p-6 text-white rounded-lg w-full mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Create Product</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Product Name */}
-        <div>
-          <label className="block mb-1 font-semibold">Product Name</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.name && <p className="text-red-500">{error.name}</p>}
+    <div className="min-h-screen w-full flex justify-center items-start py-5 pr-10">
+      <div className="w-full max-w-5xl backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl p-10">
+        {/* Header */}
+        <div className="mb-10 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-black dark:text-white tracking-tight">
+            Create New Product
+          </h2>
+          <p className="text-gray-900 dark:text-white mt-2">
+            Add product details with complete configuration
+          </p>
         </div>
 
-        {/* Brand */}
-        <div>
-          <label className="block mb-1 font-semibold">Brand</label>
-          <input
-            type="text"
-            name="brand"
-            value={formData.brand}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.brand && <p className="text-red-500">{error.brand}</p>}
-        </div>
-
-        {/* SKU */}
-        <div>
-          <label className="block mb-1 font-semibold">SKU</label>
-          <input
-            type="text"
-            name="sku"
-            value={formData.sku}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.sku && <p className="text-red-500">{error.sku}</p>}
-        </div>
-
-        {/* Short Description */}
-        <div>
-          <label className="block mb-1 font-semibold">Short Description</label>
-          <textarea
-            name="shortDescription"
-            value={formData.shortDescription}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-            rows={4}
-          />
-          {error.shortDescription && (
-            <p className="text-red-500">{error.shortDescription}</p>
-          )}
-        </div>
-
-        {/* Full Description */}
-        <div>
-          <label className="block mb-1 font-semibold">Full Description</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-            rows={4}
-          />
-          {error.description && (
-            <p className="text-red-500">{error.description}</p>
-          )}
-        </div>
-
-        {/* Category */}
-        <div>
-          <label className="block mb-1 font-semibold">Category ID</label>
-          <input
-            type="text"
-            name="category"
-            value={formData.category}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.category && <p className="text-red-500">{error.category}</p>}
-        </div>
-
-        {/* Price */}
-        <div>
-          <label className="block mb-1 font-semibold">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={formData.price}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.price && <p className="text-red-500">{error.price}</p>}
-        </div>
-
-        {/* Discount */}
-        <div>
-          <label className="block mb-1 font-semibold">Discount Type</label>
-          <select
-            name="discountType"
-            value={formData.discountType}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          >
-            <option value="fixed">Fixed</option>
-            <option value="percentage">Percentage</option>
-          </select>
-        </div>
-        <div>
-          <label className="block mb-1 font-semibold">Discount Value</label>
-          <input
-            type="number"
-            name="discountValue"
-            value={formData.discountValue}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.discountValue && (
-            <p className="text-red-500">{error.discountValue}</p>
-          )}
-        </div>
-
-        {/* Stock */}
-        <div>
-          <label className="block mb-1 font-semibold">Stock Quantity</label>
-          <input
-            type="number"
-            name="stock"
-            value={formData.stock}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.stock && <p className="text-red-500">{error.stock}</p>}
-        </div>
-
-        {/* Total Reviews */}
-        <div>
-          <label className="block mb-1 font-semibold">Total Reviews</label>
-          <input
-            type="number"
-            name="totalReviews"
-            value={formData.totalReviews}
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.totalReviews && (
-            <p className="text-red-500">{error.totalReviews}</p>
-          )}
-        </div>
-
-        {/* Flags */}
-        <div>
-          <label className="block mb-1 font-semibold">Flags</label>
-          <div className="flex flex-wrap gap-4">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Basic Info Grid */}
+          <div className="grid md:grid-cols-2 gap-6">
             {[
-              "isNew",
-              "isSale",
-              "isLimited",
-              "isHot",
-              "isFeatured",
-              "isBestSelling",
-            ].map((flag) => (
-              <label key={flag} className="flex items-center gap-2">
+              { label: "Product Name", name: "name", type: "text" },
+              { label: "Brand", name: "brand", type: "text" },
+              { label: "SKU", name: "sku", type: "text" },
+            ].map((field) => (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                  {field.label}
+                </label>
                 <input
-                  type="checkbox"
-                  name={flag}
-                  checked={formData[flag]}
-                  onChange={handleCheckboxChange}
+                  type={field.type}
+                  name={field.name}
+                  value={formData[field.name]}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                 />
-                {flag}
+                {error[field.name] && (
+                  <p className="text-red-400 text-sm mt-1">
+                    {error[field.name]}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {/* Category Dropdown */}
+            <div>
+              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                Category
               </label>
+
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+              >
+                <option value="">
+                  {categoryLoading
+                    ? "Loading categories..."
+                    : "Select Category"}
+                </option>
+
+                {categoryData?.data?.data?.map((cat,index) => (
+                  <option key={index} value={cat._id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+
+              {error.category && (
+                <p className="text-red-400 text-sm mt-1">{error.category}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Descriptions */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              { label: "Short Description", name: "shortDescription" },
+              { label: "Full Description", name: "description" },
+            ].map((field) => (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                  {field.label}
+                </label>
+                <textarea
+                  name={field.name}
+                  value={formData[field.name]}
+                  onChange={handleChange}
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
+                />
+                {error[field.name] && (
+                  <p className="text-red-400 text-sm mt-1">
+                    {error[field.name]}
+                  </p>
+                )}
+              </div>
             ))}
           </div>
-        </div>
 
-        {/* Colors */}
-        <div>
-          <label className="block mb-1 font-semibold">
-            Colors (comma separated)
-          </label>
-          <input
-            type="text"
-            name="color"
-            value={formData.color}
-            placeholder="Red, Green, Blue"
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.color && <p className="text-red-500">{error.color}</p>}
-        </div>
-
-        {/* Sizes */}
-        <div>
-          <label className="block mb-1 font-semibold">
-            Sizes (comma separated)
-          </label>
-          <input
-            type="text"
-            name="size"
-            value={formData.size}
-            placeholder="S, M, L"
-            onChange={handleChange}
-            className="w-full p-3 rounded bg-gray-800 text-white"
-          />
-          {error.size && <p className="text-red-500">{error.size}</p>}
-        </div>
-
-        {/* Images */}
-        <div>
-          <label className="block mb-1 font-semibold">Product Images</label>
-          <input
-            type="file"
-            multiple
-            onChange={handleImageChange}
-            className="w-full text-white"
-          />
-          {Object.keys(error)
-            .filter((key) => key.startsWith("images"))
-            .map((key) => (
-              <p key={key} className="text-red-500">
-                {error[key]}
-              </p>
+          {/* Pricing Section */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { label: "Price", name: "price" },
+              { label: "Stock", name: "stock" },
+              { label: "Total Reviews", name: "totalReviews" },
+            ].map((field) => (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                  {field.label}
+                </label>
+                <input
+                  type="number"
+                  name={field.name}
+                  value={formData[field.name]}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                />
+                {error[field.name] && (
+                  <p className="text-red-400 text-sm mt-1">
+                    {error[field.name]}
+                  </p>
+                )}
+              </div>
             ))}
+          </div>
 
-          {/* Image Preview */}
-          {imagePreviews.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-              {imagePreviews.map((src, index) => (
-                <div key={index} className="relative">
-                  <img
-                    src={src}
-                    alt="preview"
-                    className="w-full h-32 object-cover rounded"
+          {/* Discount */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                Discount Type
+              </label>
+              <select
+                name="discountType"
+                value={formData.discountType}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="fixed">Fixed</option>
+                <option value="percentage">Percentage</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                Discount Value
+              </label>
+              <input
+                type="number"
+                name="discountValue"
+                value={formData.discountValue}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+              {error.discountValue && (
+                <p className="text-red-400 text-sm mt-1">
+                  {error.discountValue}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Colors & Sizes */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              { label: "Colors (comma separated)", name: "color" },
+              { label: "Sizes (comma separated)", name: "size" },
+            ].map((field) => (
+              <div key={field.name}>
+                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                  {field.label}
+                </label>
+                <input
+                  type="text"
+                  name={field.name}
+                  value={formData[field.name]}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-gray-900/60 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+                {error[field.name] && (
+                  <p className="text-red-400 text-sm mt-1">
+                    {error[field.name]}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Flags */}
+          <div>
+            <label className="block text-sm font-medium text-black dark:text-gray-300 mb-3">
+              Product Flags
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                "isNew",
+                "isSale",
+                "isLimited",
+                "isHot",
+                "isFeatured",
+                "isBestSelling",
+              ].map((flag) => (
+                <label
+                  key={flag}
+                  className="flex items-center gap-3 bg-gray-900/60 border border-gray-700 rounded-xl px-4 py-3 cursor-pointer hover:border-indigo-500 transition"
+                >
+                  <input
+                    type="checkbox"
+                    name={flag}
+                    checked={formData[flag]}
+                    onChange={handleCheckboxChange}
+                    className="accent-indigo-500"
                   />
-                </div>
+                  <span className="text-black dark:text-gray-300 text-sm">
+                    {flag}
+                  </span>
+                </label>
               ))}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          className="px-6 py-3 bg-black text-white rounded hover:bg-gray-800 transition"
-        >
-          {productMutate.isPending ? "Creating..." : "Create Product"}
-        </button>
-      </form>
+          {/* Images */}
+          <div>
+            <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+              Product Images
+            </label>
+            <input
+              type="file"
+              multiple
+              onChange={handleImageChange}
+              className="w-full text-gray-400 file:bg-indigo-600 file:text-white file:border-0 file:px-4 file:py-2 file:rounded-lg file:cursor-pointer hover:file:bg-indigo-700"
+            />
+
+            {error.image && (
+              <p className="text-red-400 text-sm mt-1">{error.image}</p>
+            )}
+
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                {imagePreviews.map((src, index) => (
+                  <img
+                    key={index}
+                    src={src}
+                    alt="preview"
+                    className="w-full h-32 object-cover rounded-xl border border-gray-700"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Submit */}
+          <div className="pt-6">
+            <button
+              type="submit"
+              disabled={productMutate.isPending}
+              className="w-full py-4 rounded-2xl font-semibold text-lg bg-indigo-600 hover:bg-indigo-700 transition-all duration-300 disabled:opacity-50"
+            >
+              {productMutate.isPending ? "Creating..." : "Create Product"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
