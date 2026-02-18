@@ -1,4 +1,4 @@
-import { createProduct , getCategory } from "@/api/api";
+import { createProduct, getCategory } from "@/api/api";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
 
@@ -7,11 +7,7 @@ const AddProduct = () => {
   const productMutate = createProduct();
 
   // fetch categories for dropdown
-  const { data: categoryData, isLoading: categoryLoading } = useQuery({
-    queryKey: ["categories"],
-    queryFn: getCategory,
-  });
-
+  const { data: categoryData, isLoading: categoryLoading } = getCategory();
 
   const [formData, setFormData] = useState({
     name: "",
