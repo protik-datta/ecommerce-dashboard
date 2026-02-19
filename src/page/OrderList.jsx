@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { deleteOrder, getOrders } from "@/api/api";
 import {
-  Package,
+  Trash2,
   ShoppingBag,
   CreditCard,
-  Phone,
-  MapPin,
-  FileText,
-  Hash,
+  Users,
+  AlertTriangle,
+  Clock,
   Eye,
 } from "lucide-react";
-import { getOrders } from "@/api/api";
 import { useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 // ─── Custom Toast ─────────────────────────────────────────────────────────────
 function useToast() {
@@ -24,36 +23,34 @@ function useToast() {
     toasts,
     success: (m) => add(m, "success"),
     error: (m) => add(m, "error"),
-    info: (m) => add(m, "info"),
     remove: (id) => setToasts((p) => p.filter((t) => t.id !== id)),
   };
 }
 const TOAST_META = {
   success: { bg: "#064e3b", color: "#6ee7b7", border: "#065f46", icon: "✓" },
   error: { bg: "#450a0a", color: "#fca5a5", border: "#7f1d1d", icon: "✕" },
-  info: { bg: "#1e1b4b", color: "#a5b4fc", border: "#3730a3", icon: "ℹ" },
 };
 function ToastStack({ toasts, onRemove }) {
   if (!toasts.length) return null;
   return (
-    <div style={st.toastStack}>
+    <div style={s.toastStack}>
       {toasts.map((t) => {
         const m = TOAST_META[t.type] || TOAST_META.success;
         return (
           <div
             key={t.id}
             style={{
-              ...st.toast,
+              ...s.toast,
               background: m.bg,
               color: m.color,
               borderColor: m.border,
             }}
           >
-            <span style={st.toastIcon}>{m.icon}</span>
-            <span style={st.toastMsg}>{t.message}</span>
+            <span style={s.toastIcon}>{m.icon}</span>
+            <span style={s.toastMsg}>{t.message}</span>
             <button
               onClick={() => onRemove(t.id)}
-              style={{ ...st.toastClose, color: m.color }}
+              style={{ ...s.toastClose, color: m.color }}
             >
               ×
             </button>
@@ -64,121 +61,362 @@ function ToastStack({ toasts, onRemove }) {
   );
 }
 
-// ─── Payment badge ────────────────────────────────────────────────────────────
-const PAYMENT_STYLES = {
-  cash: {
-    bg: "rgba(16,185,129,0.12)",
-    color: "#34d399",
-    border: "rgba(16,185,129,0.25)",
-  },
-  card: {
-    bg: "rgba(99,102,241,0.12)",
-    color: "#818cf8",
-    border: "rgba(99,102,241,0.25)",
-  },
-  bkash: {
-    bg: "rgba(236,72,153,0.12)",
-    color: "#f472b6",
-    border: "rgba(236,72,153,0.25)",
-  },
-  nagad: {
-    bg: "rgba(251,146,60,0.12)",
-    color: "#fb923c",
-    border: "rgba(251,146,60,0.25)",
-  },
-  default: {
-    bg: "rgba(217,119,6,0.12)",
-    color: "#fbbf24",
-    border: "rgba(217,119,6,0.25)",
-  },
-};
-function paymentStyle(method) {
-  return PAYMENT_STYLES[(method || "").toLowerCase()] || PAYMENT_STYLES.default;
-}
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, accent }) {
+// ─── Confirm Dialog ───────────────────────────────────────────────────────────
+function ConfirmDialog({ open, onConfirm, onCancel, invoiceId }) {
+  if (!open) return null;
   return (
-    <div style={st.statCard}>
-      <div style={{ ...st.statIcon, background: accent + "18", color: accent }}>
-        <Icon size={18} />
-      </div>
-      <div>
-        <div style={st.statValue}>{value}</div>
-        <div style={st.statLabel}>{label}</div>
+    <div style={s.dialogOverlay}>
+      <div style={s.dialog}>
+        <div style={s.dialogIcon}>
+          <AlertTriangle size={24} color="#f87171" />
+        </div>
+        <div style={s.dialogTitle}>Delete Order</div>
+        <div style={s.dialogMsg}>
+          Are you sure you want to delete order{" "}
+          <strong
+            style={{ color: "#f3f4f6", fontFamily: "'Courier New', monospace" }}
+          >
+            {invoiceId}
+          </strong>
+          ? This cannot be undone.
+        </div>
+        <div style={s.dialogActions}>
+          <button onClick={onCancel} style={s.dialogCancel}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} style={s.dialogConfirm}>
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
+// ─── Virtual List ─────────────────────────────────────────────────────────────
+const ROW_HEIGHT = 90;
+const OVERSCAN = 4;
+
+function useVirtualList(items, containerRef) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(500);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerHeight(el.clientHeight);
+    const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
+    ro.observe(el);
+    const onScroll = () => setScrollTop(el.scrollTop);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [containerRef]);
+
+  const totalHeight = items.length * ROW_HEIGHT;
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const visibleCount = Math.ceil(containerHeight / ROW_HEIGHT) + OVERSCAN * 2;
+  const endIndex = Math.min(items.length, startIndex + visibleCount);
+  const offsetY = startIndex * ROW_HEIGHT;
+  const visibleItems = items.slice(startIndex, endIndex);
+
+  return { totalHeight, startIndex, offsetY, visibleItems };
+}
+
+// ─── Payment badge ────────────────────────────────────────────────────────────
+const PAYMENT_STYLES = {
+  cod: {
+    bg: "rgba(251,191,36,0.12)",
+    color: "#fbbf24",
+    border: "rgba(251,191,36,0.3)",
+    label: "COD",
+  },
+  online: {
+    bg: "rgba(16,185,129,0.12)",
+    color: "#34d399",
+    border: "rgba(16,185,129,0.3)",
+    label: "Online",
+  },
+  card: {
+    bg: "rgba(99,102,241,0.12)",
+    color: "#818cf8",
+    border: "rgba(99,102,241,0.3)",
+    label: "Card",
+  },
+};
+function PaymentBadge({ method }) {
+  const key = (method || "").toLowerCase();
+  const st = PAYMENT_STYLES[key] || {
+    bg: "rgba(255,255,255,0.06)",
+    color: "#9ca3af",
+    border: "rgba(255,255,255,0.1)",
+    label: method || "—",
+  };
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "3px 9px",
+        borderRadius: 20,
+        fontSize: 11,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        background: st.bg,
+        color: st.color,
+        border: `1px solid ${st.border}`,
+      }}
+    >
+      {st.label}
+    </span>
+  );
+}
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+function StatCard({ icon: Icon, label, value, accent }) {
+  return (
+    <div style={s.statCard}>
+      <div style={{ ...s.statIcon, background: accent + "18", color: accent }}>
+        <Icon size={18} />
+      </div>
+      <div>
+        <div style={s.statValue}>{value}</div>
+        <div style={s.statLabel}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Order Row ────────────────────────────────────────────────────────────────
+function OrderRow({
+  order,
+  index,
+  isHovered,
+  onHover,
+  onView,
+  onDelete,
+  isDeleting,
+}) {
+  const itemCount = order.items?.length || 0;
+  const itemSummary = order.items?.slice(0, 2).map((it, i) => (
+    <div key={i} style={s.itemLine}>
+      <span style={s.itemQty}>{it.qty}×</span>
+      <span style={s.itemName}>
+        {it.productId?.name ?? it.productId ?? "—"}
+      </span>
+      {it.color && <span style={s.itemMeta}>{it.color}</span>}
+      {it.size && <span style={s.itemMeta}>{it.size}</span>}
+    </div>
+  ));
+
+  return (
+    <tr
+      style={{
+        ...s.tr,
+        background: isHovered ? "#1a2233" : "transparent",
+        height: ROW_HEIGHT,
+      }}
+      onMouseEnter={() => onHover(order._id)}
+      onMouseLeave={() => onHover(null)}
+    >
+      {/* # */}
+      <td style={s.td}>
+        <span style={s.indexBadge}>{index + 1}</span>
+      </td>
+
+      {/* Invoice */}
+      <td style={s.td}>
+        <span style={s.monoText}>{order.invoiceId || "—"}</span>
+      </td>
+
+      {/* Customer */}
+      <td style={s.td}>
+        <div style={s.nameCell}>
+          <span style={s.customerName}>{order.customer?.fullName || "—"}</span>
+          <span style={s.customerPhone}>{order.customer?.phone || ""}</span>
+        </div>
+      </td>
+
+      {/* Address */}
+      <td style={s.td}>
+        <span style={s.addressText}>{order.customer?.address || "—"}</span>
+      </td>
+
+      {/* Payment */}
+      <td style={s.td}>
+        <PaymentBadge method={order.paymentMethod} />
+      </td>
+
+      {/* Items */}
+      <td style={s.td}>
+        <div style={s.itemsCell}>
+          {itemSummary}
+          {itemCount > 2 && (
+            <span style={s.moreItems}>+{itemCount - 2} more</span>
+          )}
+        </div>
+      </td>
+
+      {/* Note */}
+      <td style={s.td}>
+        <span style={s.noteText}>{order.note || "—"}</span>
+      </td>
+
+      {/* Actions */}
+      <td style={{ ...s.td, textAlign: "center" }}>
+        <div style={s.actionsCell}>
+          <button
+            style={{ ...s.viewBtn, ...(isHovered ? s.viewBtnHover : {}) }}
+            onClick={() => onView(order)}
+            title="View order details"
+          >
+            <Eye size={14} />
+          </button>
+          <button
+            style={{
+              ...s.deleteBtn,
+              ...(isHovered ? s.deleteBtnHover : {}),
+              ...(isDeleting ? s.btnDisabled : {}),
+            }}
+            onClick={() => onDelete(order)}
+            disabled={isDeleting}
+            title="Delete order"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function OrderList() {
-  const { data, isPending, isError } = getOrders();
   const navigate = useNavigate();
   const toast = useToast();
+  const scrollRef = useRef(null);
+
+  const { data, isPending, isError } = getOrders();
+  const orderDeleteMutation = deleteOrder();
+
   const orders = data?.data?.data || [];
 
-  const [hoveredRow, setHoveredRow] = useState(null);
   const [search, setSearch] = useState("");
+  const [hoveredRow, setHoveredRow] = useState(null);
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
+  const [confirmOrder, setConfirmOrder] = useState(null);
 
-  const filtered = orders.filter((o) => {
-    const q = search.toLowerCase();
-    return (
-      o.customer?.fullName?.toLowerCase().includes(q) ||
-      o.invoiceId?.toLowerCase().includes(q) ||
-      o.customer?.phone?.includes(q)
-    );
-  });
+  // ── Filter + sort ───────────────────────────────────────────────────────────
+  const filtered = orders
+    .filter((o) => {
+      const q = search.toLowerCase();
+      return (
+        o.customer?.fullName?.toLowerCase().includes(q) ||
+        o.customer?.phone?.toLowerCase().includes(q) ||
+        o.invoiceId?.toLowerCase().includes(q) ||
+        o.paymentMethod?.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (!sortKey) return 0;
+      let av = a[sortKey],
+        bv = b[sortKey];
+      if (typeof av === "string") av = av.toLowerCase();
+      if (typeof bv === "string") bv = bv.toLowerCase();
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
 
-  const handleViewMore = (order) => {
-    navigate(`/orders/${order.invoiceId}`, { state: { order } });
+  const VLIST_HEIGHT = 500;
+  const { totalHeight, offsetY, visibleItems, startIndex } = useVirtualList(
+    filtered,
+    scrollRef,
+  );
+
+  const toggleSort = useCallback(
+    (key) => {
+      if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      else {
+        setSortKey(key);
+        setSortDir("asc");
+      }
+    },
+    [sortKey],
+  );
+
+  const handleView = (order) =>
+    navigate("/order-details", { state: { order } });
+  const handleDelete = (order) => setConfirmOrder(order);
+  const confirmDelete = () => {
+    if (!confirmOrder) return;
+    orderDeleteMutation.mutate(confirmOrder.invoiceId, {
+      onSuccess: () =>
+        toast.success(`Order ${confirmOrder.invoiceId} deleted.`),
+      onError: (err) =>
+        toast.error(err?.response?.data?.message || "Delete failed."),
+      onSettled: () => setConfirmOrder(null),
+    });
   };
 
-  // ── Loading / Error ───────────────────────────────────────────────────────
+  // ── Stats ───────────────────────────────────────────────────────────────────
+  const totalItems = orders.reduce((n, o) => n + (o.items?.length || 0), 0);
+  const codOrders = orders.filter(
+    (o) => o.paymentMethod?.toLowerCase() === "cod",
+  ).length;
+  const uniqueCustomers = new Set(
+    orders.map((o) => o.customer?.phone).filter(Boolean),
+  ).size;
+
+  // ── Loading / Error ─────────────────────────────────────────────────────────
   if (isPending)
     return (
-      <div style={st.page}>
+      <div style={s.page}>
         <style>{css}</style>
-        <div style={st.centerState}>
-          <div style={st.spinner} />
-          <p style={st.stateText}>Loading orders…</p>
+        <div style={s.centerState}>
+          <div style={s.spinner} />
+          <p style={s.stateText}>Loading orders…</p>
         </div>
       </div>
     );
+
   if (isError)
     return (
-      <div style={st.page}>
+      <div style={s.page}>
         <style>{css}</style>
-        <div style={st.centerState}>
+        <div style={s.centerState}>
           <span style={{ fontSize: 40 }}>⚠️</span>
-          <p style={{ ...st.stateText, color: "#f87171" }}>
+          <p style={{ ...s.stateText, color: "#f87171" }}>
             Failed to load orders.
           </p>
         </div>
       </div>
     );
 
-  const totalItems = orders.reduce((s, o) => s + (o.items?.length || 0), 0);
-  const cashOrders = orders.filter(
-    (o) => o.paymentMethod?.toLowerCase() === "cash",
-  ).length;
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={st.page}>
+    <div style={s.page}>
       <style>{css}</style>
       <ToastStack toasts={toast.toasts} onRemove={toast.remove} />
+      <ConfirmDialog
+        open={!!confirmOrder}
+        invoiceId={confirmOrder?.invoiceId}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmOrder(null)}
+      />
 
       {/* ── Header ── */}
-      <div style={st.header}>
+      <div className="ol-header">
         <div>
-          <div style={st.breadcrumb}>
-            <span style={st.breadcrumbLink}>Dashboard</span>
-            <span style={st.breadcrumbSep}>/</span>
-            <span style={st.breadcrumbCurrent}>Orders</span>
+          <div style={s.breadcrumb}>
+            <span style={s.breadcrumbLink}>Dashboard</span>
+            <span style={s.breadcrumbSep}>/</span>
+            <span style={s.breadcrumbCurrent}>Orders</span>
           </div>
           <h1 className="ol-title">Orders</h1>
-          <p style={st.titleSub}>View and manage all customer orders.</p>
+          <p style={s.titleSub}>View and manage customer orders.</p>
         </div>
       </div>
 
@@ -191,197 +429,183 @@ export default function OrderList() {
           accent="#d97706"
         />
         <StatCard
-          icon={Package}
+          icon={Clock}
           label="Total Items"
           value={totalItems}
           accent="#818cf8"
         />
         <StatCard
-          icon={CreditCard}
-          label="Cash Orders"
-          value={cashOrders}
+          icon={Users}
+          label="Unique Customers"
+          value={uniqueCustomers}
           accent="#34d399"
+        />
+        <StatCard
+          icon={CreditCard}
+          label="COD Orders"
+          value={codOrders}
+          accent="#f87171"
         />
       </div>
 
       {/* ── Table Card ── */}
-      <div style={st.card}>
+      <div style={s.card}>
+        {/* Card header */}
         <div className="ol-card-header">
-          <div style={st.cardTitleWrap}>
-            <span style={st.cardIcon}>
-              <ShoppingBag size={18} />
+          <div style={s.cardTitleWrap}>
+            <span style={s.cardIcon}>
+              <ShoppingBag size={17} />
             </span>
             <div>
-              <div style={st.cardTitle}>Order List</div>
-              <div style={st.cardSubtitle}>{orders.length} orders total</div>
+              <div style={s.cardTitle}>Order List</div>
+              <div style={s.cardSubtitle}>
+                {filtered.length} of {orders.length} orders
+                {filtered.length !== orders.length && " (filtered)"}
+                {" · "}
+                <span style={{ color: "#d97706" }}>virtualised</span>
+              </div>
             </div>
           </div>
           <div className="ol-search-wrap">
-            <span style={st.searchIcon}>🔍</span>
+            <span style={s.searchIcon}>🔍</span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, phone, invoice…"
-              style={st.searchInput}
+              placeholder="Search name, phone, invoice, payment…"
+              style={s.searchInput}
             />
+            {search && (
+              <button onClick={() => setSearch("")} style={s.searchClear}>
+                ×
+              </button>
+            )}
           </div>
         </div>
 
-        <div style={st.tableWrap}>
-          <table style={st.table}>
-            <thead>
-              <tr>
-                {[
-                  { icon: <Hash size={12} />, label: "#" },
-                  { icon: null, label: "Customer" },
-                  { icon: <Phone size={12} />, label: "Phone" },
-                  { icon: <MapPin size={12} />, label: "Address" },
-                  { icon: <FileText size={12} />, label: "Note" },
-                  { icon: <CreditCard size={12} />, label: "Payment" },
-                  { icon: <Package size={12} />, label: "Items" },
-                  { icon: null, label: "Actions" },
-                ].map(({ icon, label }) => (
-                  <th
-                    key={label}
-                    style={{
-                      ...st.th,
-                      ...(label === "Actions" ? { textAlign: "center" } : {}),
-                    }}
-                  >
-                    {icon && <span style={st.thIcon}>{icon}</span>}
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.length === 0 ? (
+        {/* ── Virtualised Table ── */}
+        <div style={s.tableOuterWrap}>
+          {/* Fixed header */}
+          <div style={s.tableHeaderWrap}>
+            <table style={{ ...s.table, tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: 44 }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: 80 }} />
+              </colgroup>
+              <thead>
                 <tr>
-                  <td colSpan={8} style={st.emptyCell}>
-                    <div style={st.emptyState}>
-                      <span style={{ fontSize: 40 }}>📭</span>
-                      <p style={st.emptyTitle}>No orders found</p>
-                      <p style={st.emptyHint}>
-                        {search
-                          ? "Try a different search term."
-                          : "Orders will appear here once placed."}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((order, index) => {
-                  const isHovered = hoveredRow === order._id;
-                  const pmStyle = paymentStyle(order.paymentMethod);
-                  return (
-                    <tr
-                      key={order._id}
+                  {[
+                    { label: "#", key: null },
+                    { label: "Invoice", key: "invoiceId" },
+                    { label: "Customer", key: null },
+                    { label: "Address", key: null },
+                    { label: "Payment", key: "paymentMethod" },
+                    { label: "Items", key: null },
+                    { label: "Note", key: null },
+                    { label: "Actions", key: null },
+                  ].map(({ label, key }) => (
+                    <th
+                      key={label}
                       style={{
-                        ...st.tr,
-                        background: isHovered ? "#1a2233" : "transparent",
+                        ...s.th,
+                        ...(key
+                          ? { cursor: "pointer", userSelect: "none" }
+                          : {}),
+                        ...(label === "Actions" ? { textAlign: "center" } : {}),
                       }}
-                      onMouseEnter={() => setHoveredRow(order._id)}
-                      onMouseLeave={() => setHoveredRow(null)}
+                      onClick={() => key && toggleSort(key)}
                     >
-                      {/* # */}
-                      <td style={st.td}>
-                        <span style={st.indexBadge}>{index + 1}</span>
-                      </td>
-
-                      {/* Customer */}
-                      <td style={st.td}>
-                        <div style={st.customerCell}>
-                          <div style={st.avatar}>
-                            {(order.customer?.fullName || "?")[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={st.customerName}>
-                              {order.customer?.fullName}
-                            </div>
-                            <div style={st.invoiceId}>{order.invoiceId}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Phone */}
-                      <td style={st.td}>
-                        <span style={st.monoText}>
-                          {order.customer?.phone || "—"}
+                      {label}
+                      {key && sortKey === key && (
+                        <span style={s.sortArrow}>
+                          {sortDir === "asc" ? " ↑" : " ↓"}
                         </span>
-                      </td>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            </table>
+          </div>
 
-                      {/* Address */}
-                      <td style={{ ...st.td, maxWidth: 180 }}>
-                        <span style={st.addressText}>
-                          {order.customer?.address || "—"}
-                        </span>
-                      </td>
-
-                      {/* Note */}
-                      <td style={{ ...st.td, maxWidth: 140 }}>
-                        {order.note ? (
-                          <span style={st.noteText}>{order.note}</span>
-                        ) : (
-                          <span style={st.dash}>—</span>
-                        )}
-                      </td>
-
-                      {/* Payment */}
-                      <td style={st.td}>
-                        <span
-                          style={{
-                            ...st.paymentBadge,
-                            background: pmStyle.bg,
-                            color: pmStyle.color,
-                            border: `1px solid ${pmStyle.border}`,
-                          }}
-                        >
-                          {order.paymentMethod || "N/A"}
-                        </span>
-                      </td>
-
-                      {/* Items — show count only, details on detail page */}
-                      <td style={st.td}>
-                        <div style={st.itemsSummary}>
-                          <span style={st.itemsCount}>
-                            {order.items?.length || 0}
-                          </span>
-                          <span style={st.itemsLabel}>
-                            {order.items?.length === 1 ? "item" : "items"}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Actions — View More */}
-                      <td style={{ ...st.td, textAlign: "center" }}>
-                        <button
-                          onClick={() => handleViewMore(order)}
-                          style={{
-                            ...st.viewBtn,
-                            ...(isHovered ? st.viewBtnHover : {}),
-                          }}
-                          title="View order details"
-                        >
-                          <Eye size={14} />
-                          <span style={st.viewBtnLabel}>View</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          {/* Scrollable body */}
+          <div
+            ref={scrollRef}
+            style={{ ...s.tableScrollBody, height: VLIST_HEIGHT }}
+          >
+            {filtered.length === 0 ? (
+              <div style={s.emptyState}>
+                <span style={{ fontSize: 44 }}>🛒</span>
+                <p style={s.emptyTitle}>No orders found</p>
+                <p style={s.emptyHint}>
+                  {search
+                    ? "Try a different search term."
+                    : "Orders will appear here once customers place them."}
+                </p>
+              </div>
+            ) : (
+              <div style={{ height: totalHeight, position: "relative" }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: offsetY,
+                    left: 0,
+                    right: 0,
+                  }}
+                >
+                  <table style={{ ...s.table, tableLayout: "fixed" }}>
+                    <colgroup>
+                      <col style={{ width: 44 }} />
+                      <col style={{ width: "13%" }} />
+                      <col style={{ width: "16%" }} />
+                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "10%" }} />
+                      <col style={{ width: "24%" }} />
+                      <col style={{ width: "12%" }} />
+                      <col style={{ width: 80 }} />
+                    </colgroup>
+                    <tbody>
+                      {visibleItems.map((order, i) => (
+                        <OrderRow
+                          key={order._id}
+                          order={order}
+                          index={startIndex + i}
+                          isHovered={hoveredRow === order._id}
+                          onHover={setHoveredRow}
+                          onView={handleView}
+                          onDelete={handleDelete}
+                          isDeleting={orderDeleteMutation.isPending}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {filtered.length > 0 && (
-          <div className="ol-table-footer">
-            Showing{" "}
-            <strong style={{ color: "#f3f4f6" }}>{filtered.length}</strong> of{" "}
-            <strong style={{ color: "#f3f4f6" }}>{orders.length}</strong> orders
-          </div>
-        )}
+        {/* Footer */}
+        <div className="ol-table-footer">
+          Showing{" "}
+          <strong style={{ color: "#f3f4f6" }}>{filtered.length}</strong> orders
+          {filtered.length !== orders.length && (
+            <>
+              {" "}
+              ·{" "}
+              <strong style={{ color: "#d97706" }}>
+                {orders.length - filtered.length}
+              </strong>{" "}
+              hidden by filter
+            </>
+          )}
+          <span style={s.footerVirt}>· Only visible rows rendered</span>
+        </div>
       </div>
     </div>
   );
@@ -390,58 +614,71 @@ export default function OrderList() {
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+
   @keyframes spin       { to { transform: rotate(360deg); } }
   @keyframes fadeIn     { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
   @keyframes slideUp    { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
   @keyframes toastSlide { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+  @keyframes dialogIn   { from { opacity:0; transform:scale(0.95) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+
   *, *::before, *::after { box-sizing: border-box; }
-  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar       { width:6px; height:6px; }
   ::-webkit-scrollbar-track { background:#0d0d0d; }
   ::-webkit-scrollbar-thumb { background:#1f2937; border-radius:3px; }
 
   .ol-title {
     font-family: 'Playfair Display', serif;
     font-size: 30px; font-weight: 700;
-    margin: 0 0 4px; color: #f9fafb; letter-spacing: -0.02em;
+    margin: 0 0 4px; color: #f9fafb;
+    letter-spacing: -0.02em;
+  }
+  .ol-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 28px;
+    flex-wrap: wrap; gap: 16px;
   }
   .ol-stats {
-    display: grid; grid-template-columns: repeat(3, 1fr);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px; margin-bottom: 28px;
   }
   .ol-card-header {
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 14px; padding: 20px 24px; border-bottom: 1px solid #1f2937;
+    display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap;
+    gap: 14px; padding: 20px 24px;
+    border-bottom: 1px solid #1f2937;
   }
   .ol-search-wrap {
     display: flex; align-items: center; gap: 8px;
     background: #0d1117; border: 1.5px solid #1f2937;
-    border-radius: 10px; padding: 8px 14px; min-width: 260px; flex: 0 0 auto;
+    border-radius: 10px; padding: 8px 14px; min-width: 280px;
   }
   .ol-table-footer {
     padding: 14px 24px; border-top: 1px solid #1f2937;
     font-size: 12px; color: #4b5563; text-align: right;
   }
-  @media (max-width: 768px) {
-    .ol-card-header { flex-direction: column; align-items: flex-start; padding: 16px 18px; gap: 12px; }
+
+  @media (max-width: 900px) {
+    .ol-stats { grid-template-columns: repeat(2, 1fr); }
+    .ol-card-header { flex-direction: column; align-items: flex-start; padding: 16px 18px; }
     .ol-search-wrap { width: 100%; min-width: unset; }
   }
   @media (max-width: 600px) {
-    .ol-title { font-size: 22px; }
-    .ol-stats { gap: 8px; margin-bottom: 18px; }
+    .ol-title { font-size: 21px; }
+    .ol-header { margin-bottom: 18px; }
+    .ol-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
     .ol-card-header { padding: 14px; }
-    .ol-table-footer { padding: 12px 14px; text-align: center; }
+    .ol-table-footer { text-align: center; padding: 12px 14px; }
   }
   @media (max-width: 420px) {
-    .ol-title { font-size: 19px; }
-    .ol-stats { grid-template-columns: 1fr; }
+    .ol-title { font-size: 18px; }
+    .ol-stats { grid-template-columns: 1fr 1fr; }
   }
 `;
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const st = {
+const s = {
   page: {
-    minHeight: "100vh",
-    background: "#0d0d0d",
     fontFamily: "'DM Sans', sans-serif",
     color: "#e5e7eb",
     padding: "32px 24px 80px",
@@ -465,12 +702,6 @@ const st = {
   },
   stateText: { color: "#6b7280", fontSize: 14 },
 
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 28,
-  },
   breadcrumb: {
     display: "flex",
     gap: 6,
@@ -503,7 +734,7 @@ const st = {
   },
   statValue: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 700,
     color: "#f9fafb",
     lineHeight: 1,
@@ -541,37 +772,55 @@ const st = {
     fontFamily: "'DM Sans', sans-serif",
     width: "100%",
   },
+  searchClear: {
+    background: "none",
+    border: "none",
+    color: "#6b7280",
+    fontSize: 18,
+    cursor: "pointer",
+    padding: 0,
+    lineHeight: 1,
+    flexShrink: 0,
+  },
 
-  tableWrap: { overflowX: "auto", WebkitOverflowScrolling: "touch" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: 720 },
+  tableOuterWrap: { overflowX: "auto", WebkitOverflowScrolling: "touch" },
+  tableHeaderWrap: {
+    position: "sticky",
+    top: 0,
+    zIndex: 2,
+    background: "#0d1117",
+    borderBottom: "1px solid #1f2937",
+    overflowX: "hidden",
+  },
+  tableScrollBody: {
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    minWidth: 780,
+  },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: 780 },
+
   th: {
-    padding: "12px 16px",
+    padding: "12px 14px",
     fontSize: 11,
     fontWeight: 600,
     color: "#6b7280",
     textTransform: "uppercase",
     letterSpacing: "0.07em",
     background: "#0d1117",
-    borderBottom: "1px solid #1f2937",
     whiteSpace: "nowrap",
-    display: "revert",
   },
-  thIcon: {
-    display: "inline-flex",
-    alignItems: "center",
-    verticalAlign: "middle",
-    marginRight: 5,
-    opacity: 0.6,
-  },
+  sortArrow: { color: "#d97706" },
+
   tr: {
     borderBottom: "1px solid #1a2233",
-    transition: "background 0.15s ease",
+    transition: "background 0.12s ease",
   },
   td: {
-    padding: "14px 16px",
+    padding: "0 14px",
     fontSize: 13,
     color: "#d1d5db",
     verticalAlign: "middle",
+    height: ROW_HEIGHT,
   },
 
   indexBadge: {
@@ -586,107 +835,194 @@ const st = {
     fontWeight: 600,
     color: "#9ca3af",
   },
-  customerCell: { display: "flex", alignItems: "center", gap: 10 },
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    background: "linear-gradient(135deg, #92400e, #d97706)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#fff",
-    flexShrink: 0,
-  },
-  customerName: { fontSize: 13, fontWeight: 600, color: "#f3f4f6" },
-  invoiceId: {
-    fontSize: 11,
-    color: "#4b5563",
-    fontFamily: "monospace",
-    marginTop: 2,
-  },
+
   monoText: {
     fontFamily: "'Courier New', monospace",
-    fontSize: 12,
+    fontSize: 11,
     color: "#9ca3af",
-    letterSpacing: "0.02em",
+    letterSpacing: "0.03em",
   },
+
+  nameCell: { display: "flex", flexDirection: "column", gap: 2 },
+  customerName: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#f3f4f6",
+    lineHeight: 1.3,
+  },
+  customerPhone: { fontSize: 11, color: "#6b7280" },
+
   addressText: {
     fontSize: 12,
     color: "#9ca3af",
+    lineHeight: 1.4,
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
   },
+
+  itemsCell: { display: "flex", flexDirection: "column", gap: 3 },
+  itemLine: { display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" },
+  itemQty: { fontSize: 11, fontWeight: 700, color: "#d97706", flexShrink: 0 },
+  itemName: {
+    fontSize: 11,
+    color: "#9ca3af",
+    fontFamily: "'Courier New', monospace",
+  },
+  itemMeta: {
+    fontSize: 10,
+    color: "#6b7280",
+    background: "#1f2937",
+    borderRadius: 4,
+    padding: "1px 5px",
+  },
+  moreItems: { fontSize: 10, color: "#6b7280", marginTop: 1 },
+
   noteText: {
     fontSize: 12,
-    color: "#9ca3af",
-    fontStyle: "italic",
+    color: "#6b7280",
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
   },
-  dash: { color: "#374151" },
-  paymentBadge: {
-    display: "inline-block",
-    padding: "3px 10px",
-    borderRadius: 20,
-    fontSize: 11,
-    fontWeight: 600,
-    textTransform: "capitalize",
-    whiteSpace: "nowrap",
+
+  actionsCell: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
 
-  // Items summary (compact)
-  itemsSummary: { display: "flex", alignItems: "baseline", gap: 4 },
-  itemsCount: {
-    fontFamily: "'Playfair Display', serif",
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#d97706",
-  },
-  itemsLabel: { fontSize: 11, color: "#6b7280" },
-
-  // View More button
   viewBtn: {
     display: "inline-flex",
     alignItems: "center",
-    gap: 6,
-    background: "rgba(217,119,6,0.1)",
-    border: "1px solid rgba(217,119,6,0.25)",
-    color: "#d97706",
+    justifyContent: "center",
+    width: 34,
+    height: 34,
     borderRadius: 9,
-    padding: "6px 12px",
-    fontSize: 12,
-    fontWeight: 600,
+    background: "rgba(99,102,241,0.1)",
+    border: "1px solid rgba(99,102,241,0.25)",
+    color: "#818cf8",
     cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
     transition: "background 0.2s, transform 0.15s",
-    whiteSpace: "nowrap",
   },
-  viewBtnHover: { background: "rgba(217,119,6,0.2)", transform: "scale(1.04)" },
-  viewBtnLabel: { fontSize: 12 },
+  viewBtnHover: {
+    background: "rgba(99,102,241,0.2)",
+    transform: "scale(1.08)",
+  },
 
-  emptyCell: { padding: "60px 24px" },
+  deleteBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    background: "rgba(239,68,68,0.1)",
+    border: "1px solid rgba(239,68,68,0.25)",
+    color: "#f87171",
+    cursor: "pointer",
+    transition: "background 0.2s, transform 0.15s",
+  },
+  deleteBtnHover: {
+    background: "rgba(239,68,68,0.2)",
+    transform: "scale(1.08)",
+  },
+  btnDisabled: { opacity: 0.45, cursor: "not-allowed", transform: "none" },
+
   emptyState: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+    gap: 10,
+    height: "100%",
+    padding: "60px 24px",
   },
   emptyTitle: { fontSize: 15, fontWeight: 600, color: "#9ca3af", margin: 0 },
-  emptyHint: { fontSize: 12, color: "#4b5563", margin: 0 },
+  emptyHint: { fontSize: 12, color: "#4b5563", margin: 0, textAlign: "center" },
 
-  // Toast
+  footerVirt: { color: "#374151", marginLeft: 8, fontStyle: "italic" },
+
+  // ── Dialog ──
+  dialogOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 1200,
+    background: "rgba(0,0,0,0.7)",
+    backdropFilter: "blur(4px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  dialog: {
+    background: "#111827",
+    border: "1px solid #1f2937",
+    borderRadius: 20,
+    padding: "32px 28px",
+    maxWidth: 380,
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+    textAlign: "center",
+    animation: "dialogIn 0.25s cubic-bezier(0.16,1,0.3,1)",
+    boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+  },
+  dialogIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    background: "rgba(239,68,68,0.1)",
+    border: "1px solid rgba(239,68,68,0.2)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#f3f4f6",
+    fontFamily: "'Playfair Display', serif",
+  },
+  dialogMsg: { fontSize: 13, color: "#9ca3af", lineHeight: 1.6 },
+  dialogActions: { display: "flex", gap: 10, marginTop: 8, width: "100%" },
+  dialogCancel: {
+    flex: 1,
+    padding: "11px",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid #1f2937",
+    borderRadius: 10,
+    color: "#9ca3af",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  dialogConfirm: {
+    flex: 1,
+    padding: "11px",
+    background: "rgba(239,68,68,0.15)",
+    border: "1px solid rgba(239,68,68,0.3)",
+    borderRadius: 10,
+    color: "#f87171",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+  },
+
+  // ── Toast ──
   toastStack: {
     position: "fixed",
     top: 20,
     right: 20,
-    zIndex: 1100,
+    zIndex: 1300,
     display: "flex",
     flexDirection: "column",
     gap: 10,

@@ -8,6 +8,10 @@ import {
   AlertTriangle,
   Plus,
   X,
+  Tag,
+  Hash,
+  BarChart2,
+  ShoppingBag,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -92,39 +96,7 @@ function ConfirmDialog({ open, onConfirm, onCancel, productName }) {
   );
 }
 
-// ─── Virtual List ─────────────────────────────────────────────────────────────
-const ROW_HEIGHT = 74;
-const OVERSCAN = 5;
-
-function useVirtualList(items, containerRef) {
-  const [scrollTop, setScrollTop] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(520);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    setContainerHeight(el.clientHeight);
-    const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
-    ro.observe(el);
-    const onScroll = () => setScrollTop(el.scrollTop);
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      ro.disconnect();
-      el.removeEventListener("scroll", onScroll);
-    };
-  }, [containerRef]);
-
-  const totalHeight = items.length * ROW_HEIGHT;
-  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-  const visibleCount = Math.ceil(containerHeight / ROW_HEIGHT) + OVERSCAN * 2;
-  const endIndex = Math.min(items.length, startIndex + visibleCount);
-  const offsetY = startIndex * ROW_HEIGHT;
-  const visibleItems = items.slice(startIndex, endIndex);
-
-  return { totalHeight, startIndex, offsetY, visibleItems };
-}
-
-// ─── Flag config ──────────────────────────────────────────────────────────────
+// ─── Product Detail Modal ─────────────────────────────────────────────────────
 const FLAGS = [
   {
     key: "isNew",
@@ -170,6 +142,209 @@ const FLAGS = [
   },
 ];
 
+function ProductDetailModal({ prod, onClose, onEdit }) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  if (!prod) return null;
+
+  const activeFlags = FLAGS.filter((f) => prod[f.key]);
+  const effectivePrice =
+    prod.discountValue > 0
+      ? prod.discountType === "percentage"
+        ? Number(prod.price) * (1 - prod.discountValue / 100)
+        : Number(prod.price) - prod.discountValue
+      : null;
+
+  return (
+    <div style={s.dialogOverlay} onClick={onClose}>
+      <div style={s.detailModal} onClick={(e) => e.stopPropagation()}>
+        {/* Close */}
+        <button style={s.detailClose} onClick={onClose} title="Close">
+          <X size={16} />
+        </button>
+
+        {/* Top strip: image + headline */}
+        <div style={s.detailTop}>
+          {prod.image?.[0]?.url ? (
+            <img src={prod.image[0].url} alt={prod.name} style={s.detailImg} />
+          ) : (
+            <div style={s.detailImgPlaceholder}>
+              <Package size={36} color="#374151" />
+            </div>
+          )}
+          <div style={s.detailHeadline}>
+            <div style={s.detailName}>{prod.name}</div>
+            {prod.brand && <div style={s.detailBrand}>{prod.brand}</div>}
+            {/* Flags */}
+            {activeFlags.length > 0 && (
+              <div style={s.detailFlags}>
+                {activeFlags.map((f) => (
+                  <span
+                    key={f.key}
+                    style={{
+                      ...s.flagChip,
+                      background: f.bg,
+                      color: f.color,
+                      border: `1px solid ${f.border}`,
+                    }}
+                  >
+                    {f.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={s.detailDivider} />
+
+        {/* Info grid */}
+        <div style={s.detailGrid}>
+          <DetailField
+            icon={<Tag size={13} />}
+            label="Category"
+            value={prod.category?.name || "—"}
+          />
+          <DetailField
+            icon={<Hash size={13} />}
+            label="SKU"
+            value={prod.sku || "—"}
+            mono
+          />
+          <DetailField
+            icon={<DollarSign size={13} />}
+            label="Price"
+            value={
+              <span>
+                <span style={{ color: "#f3f4f6", fontWeight: 700 }}>
+                  ${Number(prod.price).toFixed(2)}
+                </span>
+                {effectivePrice !== null && (
+                  <span
+                    style={{ color: "#34d399", fontSize: 11, marginLeft: 6 }}
+                  >
+                    → ${effectivePrice.toFixed(2)} after discount
+                  </span>
+                )}
+              </span>
+            }
+          />
+          <DetailField
+            icon={<BarChart2 size={13} />}
+            label="Stock"
+            value={
+              prod.stock === 0 ? (
+                <span style={{ color: "#f87171", fontWeight: 600 }}>
+                  Out of Stock
+                </span>
+              ) : (
+                <span
+                  style={{
+                    color: prod.stock < 10 ? "#fb923c" : "#34d399",
+                    fontWeight: 600,
+                  }}
+                >
+                  {prod.stock} units
+                </span>
+              )
+            }
+          />
+          {prod.discountValue > 0 && (
+            <DetailField
+              icon={<ShoppingBag size={13} />}
+              label="Discount"
+              value={
+                prod.discountType === "percentage"
+                  ? `${prod.discountValue}% off`
+                  : `$${prod.discountValue} off`
+              }
+            />
+          )}
+        </div>
+
+        {/* Description */}
+        {prod.description && (
+          <>
+            <div style={s.detailDivider} />
+            <div style={s.detailDescLabel}>Description</div>
+            <div style={s.detailDesc}>{prod.description}</div>
+          </>
+        )}
+
+        {/* Actions */}
+        <div style={s.detailDivider} />
+        <div style={s.detailActions}>
+          <button
+            style={s.detailEditBtn}
+            onClick={() => {
+              onClose();
+              onEdit(prod);
+            }}
+          >
+            <Edit2 size={14} /> Edit Product
+          </button>
+          <button style={s.detailCancelBtn} onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailField({ icon, label, value, mono }) {
+  return (
+    <div style={s.detailField}>
+      <div style={s.detailFieldLabel}>
+        <span style={s.detailFieldIcon}>{icon}</span>
+        {label}
+      </div>
+      <div style={{ ...s.detailFieldValue, ...(mono ? s.monoText : {}) }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ─── Virtual List ─────────────────────────────────────────────────────────────
+const ROW_HEIGHT = 74;
+const OVERSCAN = 5;
+
+function useVirtualList(items, containerRef) {
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(520);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerHeight(el.clientHeight);
+    const ro = new ResizeObserver(() => setContainerHeight(el.clientHeight));
+    ro.observe(el);
+    const onScroll = () => setScrollTop(el.scrollTop);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [containerRef]);
+
+  const totalHeight = items.length * ROW_HEIGHT;
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const visibleCount = Math.ceil(containerHeight / ROW_HEIGHT) + OVERSCAN * 2;
+  const endIndex = Math.min(items.length, startIndex + visibleCount);
+  const offsetY = startIndex * ROW_HEIGHT;
+  const visibleItems = items.slice(startIndex, endIndex);
+
+  return { totalHeight, startIndex, offsetY, visibleItems };
+}
+
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
@@ -193,6 +368,7 @@ function ProductRow({
   onHover,
   onEdit,
   onDelete,
+  onRowClick,
   isDeleting,
 }) {
   return (
@@ -201,9 +377,12 @@ function ProductRow({
         ...s.tr,
         background: isHovered ? "#1a2233" : "transparent",
         height: ROW_HEIGHT,
+        cursor: "pointer",
       }}
       onMouseEnter={() => onHover(prod._id || prod.slug)}
       onMouseLeave={() => onHover(null)}
+      onClick={() => onRowClick(prod)}
+      title="Click to view details"
     >
       {/* # */}
       <td style={s.td}>
@@ -295,7 +474,10 @@ function ProductRow({
         <div style={s.actionsCell}>
           <button
             style={{ ...s.editBtn, ...(isHovered ? s.editBtnHover : {}) }}
-            onClick={() => onEdit(prod)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(prod);
+            }}
             title="Edit product"
           >
             <Edit2 size={14} />
@@ -306,7 +488,10 @@ function ProductRow({
               ...(isHovered ? s.deleteBtnHover : {}),
               ...(isDeleting ? s.btnDisabled : {}),
             }}
-            onClick={() => onDelete(prod)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(prod);
+            }}
             disabled={isDeleting}
             title="Delete product"
           >
@@ -315,6 +500,34 @@ function ProductRow({
         </div>
       </td>
     </tr>
+  );
+}
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+function EmptyState({ isFiltered, search, onClear, onAdd }) {
+  return (
+    <div style={s.emptyState}>
+      <div style={s.emptyIconWrap}>
+        <Package size={38} color="#374151" />
+      </div>
+      <p style={s.emptyTitle}>
+        {isFiltered ? "No products match your search" : "No products found"}
+      </p>
+      <p style={s.emptyHint}>
+        {isFiltered
+          ? `No results for "${search}". Try a different term.`
+          : "Your catalogue is empty. Add your first product to get started."}
+      </p>
+      {isFiltered ? (
+        <button onClick={onClear} style={s.emptyBtn}>
+          Clear Search
+        </button>
+      ) : (
+        <button onClick={onAdd} style={s.emptyBtn}>
+          + Add Product
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -333,7 +546,8 @@ export default function ProductList() {
   const [hoveredRow, setHoveredRow] = useState(null);
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
-  const [confirmProd, setConfirmProd] = useState(null); // product pending delete
+  const [confirmProd, setConfirmProd] = useState(null);
+  const [detailProd, setDetailProd] = useState(null); // ← new: detail modal
 
   // ── Filter + sort ───────────────────────────────────────────────────────────
   const filtered = products
@@ -376,6 +590,7 @@ export default function ProductList() {
   const handleEdit = (prod) =>
     navigate("/edit-product", { state: { products: prod } });
   const handleDelete = (prod) => setConfirmProd(prod);
+  const handleRowClick = (prod) => setDetailProd(prod);
 
   const confirmDelete = () => {
     if (!confirmProd) return;
@@ -427,11 +642,19 @@ export default function ProductList() {
     <div style={s.page}>
       <style>{css}</style>
       <ToastStack toasts={toast.toasts} onRemove={toast.remove} />
+
       <ConfirmDialog
         open={!!confirmProd}
         productName={confirmProd?.name}
         onConfirm={confirmDelete}
         onCancel={() => setConfirmProd(null)}
+      />
+
+      {/* ── Product Detail Modal ── */}
+      <ProductDetailModal
+        prod={detailProd}
+        onClose={() => setDetailProd(null)}
+        onEdit={handleEdit}
       />
 
       {/* ── Header ── */}
@@ -500,6 +723,12 @@ export default function ProductList() {
                 {filtered.length !== products.length && " (filtered)"}
                 {" · "}
                 <span style={{ color: "#d97706" }}>virtualised</span>
+                {products.length > 0 && (
+                  <span style={{ color: "#4b5563" }}>
+                    {" "}
+                    · click a row to view details
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -519,142 +748,145 @@ export default function ProductList() {
           </div>
         </div>
 
-        {/* ── Virtualised Table ── */}
-        <div style={s.tableOuterWrap}>
-          {/* Fixed header */}
-          <div style={s.tableHeaderWrap}>
-            <table style={{ ...s.table, tableLayout: "fixed" }}>
-              <colgroup>
-                <col style={{ width: 42 }} />
-                <col style={{ width: 62 }} />
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: 72 }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: 76 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  {[
-                    { label: "#", key: null },
-                    { label: "Image", key: null },
-                    { label: "Name", key: "name" },
-                    { label: "SKU", key: "sku" },
-                    { label: "Category", key: null },
-                    { label: "Price", key: "price" },
-                    { label: "Stock", key: "stock" },
-                    { label: "Flags", key: null },
-                    { label: "Actions", key: null },
-                  ].map(({ label, key }) => (
-                    <th
-                      key={label}
-                      style={{
-                        ...s.th,
-                        ...(key
-                          ? { cursor: "pointer", userSelect: "none" }
-                          : {}),
-                        ...(label === "Actions" ? { textAlign: "center" } : {}),
-                      }}
-                      onClick={() => key && toggleSort(key)}
-                    >
-                      {label}
-                      {key && sortKey === key && (
-                        <span style={s.sortArrow}>
-                          {sortDir === "asc" ? " ↑" : " ↓"}
-                        </span>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-            </table>
-          </div>
+        {/* ── Content: empty state OR virtualised table ── */}
+        {products.length === 0 ? (
+          /* Catalogue is genuinely empty */
+          <EmptyState
+            isFiltered={false}
+            onAdd={() => navigate("/add-product")}
+          />
+        ) : (
+          <>
+            {/* ── Virtualised Table ── */}
+            <div style={s.tableOuterWrap}>
+              {/* Fixed header */}
+              <div style={s.tableHeaderWrap}>
+                <table style={{ ...s.table, tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 42 }} />
+                    <col style={{ width: 62 }} />
+                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "13%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: 72 }} />
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: 76 }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      {[
+                        { label: "#", key: null },
+                        { label: "Image", key: null },
+                        { label: "Name", key: "name" },
+                        { label: "SKU", key: "sku" },
+                        { label: "Category", key: null },
+                        { label: "Price", key: "price" },
+                        { label: "Stock", key: "stock" },
+                        { label: "Flags", key: null },
+                        { label: "Actions", key: null },
+                      ].map(({ label, key }) => (
+                        <th
+                          key={label}
+                          style={{
+                            ...s.th,
+                            ...(key
+                              ? { cursor: "pointer", userSelect: "none" }
+                              : {}),
+                            ...(label === "Actions"
+                              ? { textAlign: "center" }
+                              : {}),
+                          }}
+                          onClick={() => key && toggleSort(key)}
+                        >
+                          {label}
+                          {key && sortKey === key && (
+                            <span style={s.sortArrow}>
+                              {sortDir === "asc" ? " ↑" : " ↓"}
+                            </span>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                </table>
+              </div>
 
-          {/* Scrollable body */}
-          <div
-            ref={scrollRef}
-            style={{ ...s.tableScrollBody, height: VLIST_HEIGHT }}
-          >
-            {filtered.length === 0 ? (
-              <div style={s.emptyState}>
-                <span style={{ fontSize: 44 }}>📦</span>
-                <p style={s.emptyTitle}>No products found</p>
-                <p style={s.emptyHint}>
-                  {search
-                    ? "Try a different search term."
-                    : "Add your first product to get started."}
-                </p>
-                {!search && (
-                  <button
-                    onClick={() => navigate("/add-product")}
-                    style={s.emptyBtn}
-                  >
-                    + Add Product
-                  </button>
+              {/* Scrollable body */}
+              <div
+                ref={scrollRef}
+                style={{ ...s.tableScrollBody, height: VLIST_HEIGHT }}
+              >
+                {filtered.length === 0 ? (
+                  /* Search filter returned nothing */
+                  <EmptyState
+                    isFiltered
+                    search={search}
+                    onClear={() => setSearch("")}
+                  />
+                ) : (
+                  <div style={{ height: totalHeight, position: "relative" }}>
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: offsetY,
+                        left: 0,
+                        right: 0,
+                      }}
+                    >
+                      <table style={{ ...s.table, tableLayout: "fixed" }}>
+                        <colgroup>
+                          <col style={{ width: 42 }} />
+                          <col style={{ width: 62 }} />
+                          <col style={{ width: "20%" }} />
+                          <col style={{ width: "12%" }} />
+                          <col style={{ width: "13%" }} />
+                          <col style={{ width: "11%" }} />
+                          <col style={{ width: 72 }} />
+                          <col style={{ width: "18%" }} />
+                          <col style={{ width: 76 }} />
+                        </colgroup>
+                        <tbody>
+                          {visibleItems.map((prod, i) => (
+                            <ProductRow
+                              key={prod._id || prod.slug}
+                              prod={prod}
+                              index={startIndex + i}
+                              isHovered={hoveredRow === (prod._id || prod.slug)}
+                              onHover={setHoveredRow}
+                              onEdit={handleEdit}
+                              onDelete={handleDelete}
+                              onRowClick={handleRowClick}
+                              isDeleting={deleteProductMutation.isPending}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
               </div>
-            ) : (
-              <div style={{ height: totalHeight, position: "relative" }}>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: offsetY,
-                    left: 0,
-                    right: 0,
-                  }}
-                >
-                  <table style={{ ...s.table, tableLayout: "fixed" }}>
-                    <colgroup>
-                      <col style={{ width: 42 }} />
-                      <col style={{ width: 62 }} />
-                      <col style={{ width: "20%" }} />
-                      <col style={{ width: "12%" }} />
-                      <col style={{ width: "13%" }} />
-                      <col style={{ width: "11%" }} />
-                      <col style={{ width: 72 }} />
-                      <col style={{ width: "18%" }} />
-                      <col style={{ width: 76 }} />
-                    </colgroup>
-                    <tbody>
-                      {visibleItems.map((prod, i) => (
-                        <ProductRow
-                          key={prod._id || prod.slug}
-                          prod={prod}
-                          index={startIndex + i}
-                          isHovered={hoveredRow === (prod._id || prod.slug)}
-                          onHover={setHoveredRow}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          isDeleting={deleteProductMutation.isPending}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Footer */}
-        <div className="pl-table-footer">
-          Showing{" "}
-          <strong style={{ color: "#f3f4f6" }}>{filtered.length}</strong>{" "}
-          products
-          {filtered.length !== products.length && (
-            <>
-              {" "}
-              ·{" "}
-              <strong style={{ color: "#d97706" }}>
-                {products.length - filtered.length}
-              </strong>{" "}
-              hidden by filter
-            </>
-          )}
-          <span style={s.footerVirt}>· Only visible rows rendered</span>
-        </div>
+            {/* Footer */}
+            <div className="pl-table-footer">
+              Showing{" "}
+              <strong style={{ color: "#f3f4f6" }}>{filtered.length}</strong>{" "}
+              products
+              {filtered.length !== products.length && (
+                <>
+                  {" "}
+                  ·{" "}
+                  <strong style={{ color: "#d97706" }}>
+                    {products.length - filtered.length}
+                  </strong>{" "}
+                  hidden by filter
+                </>
+              )}
+              <span style={s.footerVirt}>· Only visible rows rendered</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -664,11 +896,12 @@ export default function ProductList() {
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
 
-  @keyframes spin        { to { transform: rotate(360deg); } }
-  @keyframes fadeIn      { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes slideUp     { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes toastSlide  { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
-  @keyframes dialogIn    { from { opacity:0; transform:scale(0.95) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  @keyframes spin       { to { transform: rotate(360deg); } }
+  @keyframes fadeIn     { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes slideUp    { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes toastSlide { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+  @keyframes dialogIn   { from { opacity:0; transform:scale(0.95) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+  @keyframes emptyIn    { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
 
   *, *::before, *::after { box-sizing: border-box; }
   ::-webkit-scrollbar       { width:6px; height:6px; }
@@ -1037,28 +1270,47 @@ const s = {
   },
   btnDisabled: { opacity: 0.45, cursor: "not-allowed", transform: "none" },
 
+  // ── Empty state ──
   emptyState: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    height: "100%",
-    padding: "60px 24px",
+    gap: 12,
+    padding: "72px 24px",
+    animation: "emptyIn 0.4s cubic-bezier(0.16,1,0.3,1)",
   },
-  emptyTitle: { fontSize: 15, fontWeight: 600, color: "#9ca3af", margin: 0 },
-  emptyHint: { fontSize: 12, color: "#4b5563", margin: 0 },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    background: "rgba(31,41,55,0.6)",
+    border: "1.5px dashed #374151",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: 600, color: "#9ca3af", margin: 0 },
+  emptyHint: {
+    fontSize: 13,
+    color: "#4b5563",
+    margin: 0,
+    textAlign: "center",
+    maxWidth: 300,
+  },
   emptyBtn: {
-    marginTop: 6,
-    padding: "8px 20px",
+    marginTop: 8,
+    padding: "9px 22px",
     background: "rgba(217,119,6,0.12)",
     border: "1px solid rgba(217,119,6,0.3)",
     color: "#d97706",
-    borderRadius: 9,
+    borderRadius: 10,
     fontSize: 13,
     fontWeight: 500,
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
+    transition: "background 0.2s",
   },
 
   footerVirt: { color: "#374151", marginLeft: 8, fontStyle: "italic" },
@@ -1130,6 +1382,137 @@ const s = {
     border: "1px solid rgba(239,68,68,0.3)",
     borderRadius: 10,
     color: "#f87171",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    transition: "background 0.2s",
+  },
+
+  // ── Product detail modal ──
+  detailModal: {
+    background: "#111827",
+    border: "1px solid #1f2937",
+    borderRadius: 22,
+    padding: "28px 28px 24px",
+    maxWidth: 480,
+    width: "100%",
+    position: "relative",
+    animation: "dialogIn 0.28s cubic-bezier(0.16,1,0.3,1)",
+    boxShadow: "0 32px 100px rgba(0,0,0,0.8)",
+    maxHeight: "90vh",
+    overflowY: "auto",
+  },
+  detailClose: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid #1f2937",
+    color: "#6b7280",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailTop: {
+    display: "flex",
+    gap: 18,
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  detailImg: {
+    width: 88,
+    height: 88,
+    borderRadius: 14,
+    objectFit: "cover",
+    border: "1.5px solid #1f2937",
+    flexShrink: 0,
+  },
+  detailImgPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 14,
+    background: "#1a2233",
+    border: "1.5px dashed #374151",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  detailHeadline: { flex: 1, paddingTop: 2 },
+  detailName: {
+    fontFamily: "'Playfair Display', serif",
+    fontSize: 20,
+    fontWeight: 700,
+    color: "#f9fafb",
+    lineHeight: 1.3,
+    marginBottom: 4,
+  },
+  detailBrand: { fontSize: 12, color: "#6b7280", marginBottom: 10 },
+  detailFlags: { display: "flex", flexWrap: "wrap", gap: 5 },
+
+  detailDivider: { height: 1, background: "#1f2937", margin: "18px 0" },
+
+  detailGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
+  detailField: {
+    background: "#0d1117",
+    border: "1px solid #1f2937",
+    borderRadius: 10,
+    padding: "12px 14px",
+  },
+  detailFieldLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: 6,
+  },
+  detailFieldIcon: { color: "#4b5563" },
+  detailFieldValue: { fontSize: 14, color: "#d1d5db", fontWeight: 500 },
+
+  detailDescLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: 8,
+  },
+  detailDesc: { fontSize: 13, color: "#9ca3af", lineHeight: 1.7 },
+
+  detailActions: { display: "flex", gap: 10 },
+  detailEditBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    flex: 1,
+    padding: "11px",
+    background: "rgba(99,102,241,0.12)",
+    border: "1px solid rgba(99,102,241,0.3)",
+    borderRadius: 10,
+    color: "#818cf8",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+    justifyContent: "center",
+    transition: "background 0.2s",
+  },
+  detailCancelBtn: {
+    flex: 1,
+    padding: "11px",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid #1f2937",
+    borderRadius: 10,
+    color: "#9ca3af",
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",

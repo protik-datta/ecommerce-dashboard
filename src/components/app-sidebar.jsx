@@ -78,8 +78,6 @@ const data = {
       items: [
         { title: "Add Product", url: "/add-product" },
         { title: "Product List", url: "/product-list" },
-        { title: "Upload Product Image", url: "/upload-image" },
-        { title: "Delete Product Image", url: "/delete-image" },
       ],
     },
     {

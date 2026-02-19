@@ -22,6 +22,21 @@ export const createCategory = () => {
   });
 };
 
+// update category
+export const updateCategory = () => {
+  return useMutation({
+    mutationFn: (data) => {
+      return api.put(`/categories/update-category/${data.slug}`, data);
+    },
+    onSuccess: (data) => {
+      console.log(data);
+    },
+    onError: (error) => {
+      console.log(error);
+    },
+  });
+};
+
 // get category
 export const getCategory = () => {
   return useQuery({
@@ -51,11 +66,58 @@ export const deleteCategory = () => {
   });
 };
 
-// add product
+// create product
 export const createProduct = () => {
   return useMutation({
     mutationFn: (data) => {
       return api.post("/product/create-product", data);
+    },
+    onSuccess: (data) => {
+      console.log(data);
+    },
+    onError: (error) => {
+      console.log(error);
+    },
+  });
+};
+
+// update product
+export const updateProduct = () => {
+  return useMutation({
+    mutationFn: (data) => {
+      return api.put(`/product/update-productinfo/${data.slug}`, data);
+    },
+    onSuccess: (data) => {
+      console.log(data);
+    },
+    onError: (error) => {
+      console.log(error);
+    },
+  });
+};
+
+// delete product image
+export const deleteProductImage = () => {
+  return useMutation({
+    mutationFn: (data) => {
+      return api.delete(
+        `/product/delete-productimage/${data.slug}/${data.imgID}`,
+      );
+    },
+    onSuccess: (data) => {
+      console.log(data);
+    },
+    onError: (error) => {
+      console.log(error);
+    },
+  });
+};
+
+// upload product image
+export const uploadProductImage = () => {
+  return useMutation({
+    mutationFn: (data) => {
+      return api.post(`/product/upload-product-image/${data.slug}`, data.formData);
     },
     onSuccess: (data) => {
       console.log(data);
@@ -91,19 +153,29 @@ export const deleteProduct = () => {
     },
     onError: (error) => {
       console.log(error);
-    }
-  })
-}
+    },
+  });
+};
 
 // order list
 export const getOrders = () => {
   return useQuery({
-    queryKey: ['orders'],
+    queryKey: ["orders"],
     queryFn: () => {
       return api.get("/order/get-orders");
-    }
-  })
-}
+    },
+  });
+};
+
+// get order details
+export const getOrderByInvoice = () => {
+  return useQuery({
+    queryKey: ["orderDetails"],
+    queryFn: (invID) => {
+      return api.get(`/order/get-order/${invID}`);
+    },
+  });
+};
 
 // delete order
 export const deleteOrder = () => {
@@ -115,11 +187,11 @@ export const deleteOrder = () => {
     onSuccess: (data) => {
       console.log(data);
       queryClient.invalidateQueries({
-        queryKey: ['orders']
-      })
+        queryKey: ["orders"],
+      });
     },
     onError: (error) => {
       console.log(error);
-    }
-  })
-}
+    },
+  });
+};
