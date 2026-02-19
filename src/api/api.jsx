@@ -76,6 +76,25 @@ export const getProducts = () => {
   });
 };
 
+// delete product
+export const deleteProduct = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (slug) => {
+      return api.delete(`/product/delete-product/${slug}`);
+    },
+    onSuccess: (data) => {
+      console.log(data);
+      queryClient.invalidateQueries({
+        queryKey: ["products"],
+      });
+    },
+    onError: (error) => {
+      console.log(error);
+    }
+  })
+}
+
 // order list
 export const getOrders = () => {
   return useQuery({
