@@ -2,7 +2,6 @@ import {
   CircleDollarSign,
   ShoppingCartIcon,
   TagIcon,
-  UserRound,
   LayoutGrid,
   Package,
   ListOrdered,
@@ -20,95 +19,83 @@ import { getCategory } from "@/api/api";
 import { getProducts } from "@/api/api";
 import { getOrders, deleteOrder } from "@/api/api";
 
-// ─── Tiny helpers ────────────────────────────────────────────────────────────
-
-const statusColor = (s = "") => {
+const statusMeta = (s = "") => {
   const map = {
-    pending: "text-amber-400 bg-amber-400/10 border-amber-400/30",
-    completed: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
-    shipped: "text-sky-400 bg-sky-400/10 border-sky-400/30",
-    cancelled: "text-rose-400 bg-rose-400/10 border-rose-400/30",
+    pending: { color: "#da7708", bg: "#da77081a", border: "#da770833" },
+    completed: { color: "#4ade80", bg: "#4ade801a", border: "#4ade8033" },
+    shipped: { color: "#60a5fa", bg: "#60a5fa1a", border: "#60a5fa33" },
+    cancelled: { color: "#f87171", bg: "#f871711a", border: "#f8717133" },
   };
   return (
-    map[s.toLowerCase()] ?? "text-slate-400 bg-slate-400/10 border-slate-400/30"
+    map[s.toLowerCase()] ?? {
+      color: "#607d99",
+      bg: "#607d991a",
+      border: "#607d9933",
+    }
   );
 };
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-const KPICard = ({ title, value, icon: Icon, accent, delta }) => (
+const KPICard = ({ title, value, icon: Icon, accent, delta, idx }) => (
   <div
-    className="relative overflow-hidden rounded-2xl border p-6 flex flex-col gap-4 group transition-all duration-300 hover:-translate-y-1"
-    style={{
-      background:
-        "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
-      borderColor: "rgba(255,255,255,0.08)",
-      backdropFilter: "blur(12px)",
-    }}
+    className="kpi"
+    style={{ "--a": accent, animationDelay: `${idx * 60}ms` }}
   >
-    {/* glow blob */}
-    <div
-      className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity"
-      style={{ background: accent }}
-    />
-    <div className="flex items-start justify-between">
+    <div className="kpi-top">
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center"
-        style={{ background: `${accent}22`, border: `1px solid ${accent}44` }}
+        className="kpi-icon"
+        style={{ background: `${accent}1a`, border: `1px solid ${accent}33` }}
       >
-        <Icon size={20} style={{ color: accent }} />
+        <Icon size={15} style={{ color: accent }} />
       </div>
       {delta !== undefined && (
-        <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-          <TrendingUp size={12} /> +{delta}%
+        <span className="kpi-delta">
+          <TrendingUp size={9} /> +{delta}%
         </span>
       )}
     </div>
-    <div>
-      <p className="text-3xl font-bold text-white tracking-tight">{value}</p>
-      <p className="text-sm text-slate-400 mt-1 font-medium">{title}</p>
-    </div>
+    <p className="kpi-val">{value}</p>
+    <p className="kpi-lbl">{title}</p>
   </div>
 );
 
-const SectionCard = ({ title, action, onAction, children }) => (
-  <div
-    className="rounded-2xl border flex flex-col overflow-hidden"
-    style={{
-      background: "rgba(255,255,255,0.03)",
-      borderColor: "rgba(255,255,255,0.08)",
-    }}
-  >
-    <div
-      className="flex items-center justify-between px-6 py-4 border-b"
-      style={{ borderColor: "rgba(255,255,255,0.06)" }}
-    >
-      <h2 className="text-sm font-semibold text-white uppercase tracking-widest">
-        {title}
-      </h2>
-      {action && (
-        <button
-          onClick={onAction}
-          className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
-        >
-          {action} <ChevronRight size={12} />
+const Panel = ({ title, cta, onCta, children }) => (
+  <div className="panel">
+    <div className="panel-hd">
+      <span className="panel-title">{title}</span>
+      {cta && (
+        <button className="panel-cta" onClick={onCta}>
+          {cta} <ChevronRight size={10} />
         </button>
       )}
     </div>
-    <div className="flex-1">{children}</div>
+    {children}
   </div>
 );
 
-const Skeleton = ({ className }) => (
+const Bone = ({ h = 32 }) => <div className="bone" style={{ height: h }} />;
+const BoneList = ({ n = 4, h }) => (
   <div
-    className={`rounded animate-pulse ${className}`}
-    style={{ background: "rgba(255,255,255,0.06)" }}
-  />
+    style={{
+      padding: "12px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 7,
+    }}
+  >
+    {[...Array(n)].map((_, i) => (
+      <Bone key={i} h={h} />
+    ))}
+  </div>
 );
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+const Empty = ({ icon: Icon, msg }) => (
+  <div className="empty-st">
+    <Icon size={18} />
+    <p>{msg}</p>
+  </div>
+);
 
-const Page = () => {
+export default function Page() {
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState(null);
 
@@ -123,367 +110,783 @@ const Page = () => {
 
   const revenue = orders
     .filter((o) => (o.status ?? "").toLowerCase() === "completed")
-    .reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
+    .reduce((s, o) => s + (parseFloat(o.totalAmount) || 0), 0);
 
-  const kpiData = [
+  const kpis = [
     {
-      title: "Total Products",
+      title: "Products",
       value: prodLoading ? "—" : products.length,
       icon: TagIcon,
-      accent: "#a78bfa",
+      accent: "#da7708",
       delta: 12,
     },
     {
-      title: "Total Orders",
+      title: "Orders",
       value: orderLoading ? "—" : orders.length,
       icon: ShoppingCartIcon,
-      accent: "#38bdf8",
+      accent: "#60a5fa",
       delta: 8,
     },
     {
       title: "Categories",
       value: catLoading ? "—" : categories.length,
       icon: LayoutGrid,
-      accent: "#fb923c",
+      accent: "#c084fc",
     },
     {
       title: "Revenue",
-      value: orderLoading ? "—" : `$${revenue.toLocaleString()}`,
+      value: orderLoading ? "—" : `৳${revenue.toLocaleString()}`,
       icon: CircleDollarSign,
-      accent: "#34d399",
+      accent: "#4ade80",
       delta: 23,
     },
   ];
 
-  const handleDeleteOrder = async (invID) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Delete this order?")) return;
-    setDeletingId(invID);
-    await deleteMutation.mutateAsync(invID).finally(() => setDeletingId(null));
+    setDeletingId(id);
+    await deleteMutation.mutateAsync(id).finally(() => setDeletingId(null));
   };
 
   return (
-    <div
-      className="min-h-screen w-full text-white"
-      style={{
-        background:
-          "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,0.15) 0%, transparent 60%), #09090b",
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-    >
-      {/* Google Fonts import via style */}
+    <div className="pg">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 9999px; }
-        @keyframes fadeUp {
-          from { opacity:0; transform:translateY(16px); }
-          to   { opacity:1; transform:translateY(0); }
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&display=swap');
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+          --panel:  #0c1829;
+          --lift:   #111f30;
+          --border: #172335;
+          --line:   #1d2f45;
+          --amber:  #da7708;
+          --amb10:  #da77081a;
+          --amb25:  #da770840;
+          --ink:    #cddaec;
+          --dim:    #5c7892;
+          --muted:  #2d4360;
+          --font:   'Geist Mono', 'Fira Code', ui-monospace, monospace;
         }
-        .fade-up { animation: fadeUp 0.5s ease forwards; }
-        .fade-up-1 { animation-delay: 0.05s; opacity:0; }
-        .fade-up-2 { animation-delay: 0.12s; opacity:0; }
-        .fade-up-3 { animation-delay: 0.20s; opacity:0; }
-        .fade-up-4 { animation-delay: 0.28s; opacity:0; }
+
+        /* ── Page ──────────────────────────────────────────── */
+        .pg {
+          min-height: 100vh;
+          background:
+            radial-gradient(ellipse 55% 35% at 10% 0%, #da77080f 0%, transparent 55%),
+            var(--bg);
+          font-family: var(--font);
+          color: var(--ink);
+          padding: 24px 20px 48px;
+        }
+
+        @media (min-width: 640px)  { .pg { padding: 28px 28px 52px; } }
+        @media (min-width: 1024px) { .pg { padding: 36px 40px 60px; } }
+
+        .pg-inner {
+          max-width: 1280px;
+          margin: 0 auto;
+        }
+
+        /* ── Header ────────────────────────────────────────── */
+        .hd {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          margin-bottom: 28px;
+          padding-bottom: 20px;
+          border-bottom: 1px solid var(--border);
+          animation: up 0.5s ease both;
+        }
+
+        @media (min-width: 640px) {
+          .hd {
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-bottom: 32px;
+          }
+        }
+
+        .hd-label {
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.26em;
+          text-transform: uppercase;
+          color: var(--amber);
+          margin-bottom: 6px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .hd-label::before {
+          content: '';
+          width: 16px; height: 2px;
+          background: var(--amber);
+          border-radius: 1px;
+        }
+
+        .hd-title {
+          font-size: 26px;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+          color: var(--ink);
+          line-height: 1.1;
+        }
+
+        @media (min-width: 640px) { .hd-title { font-size: 30px; } }
+
+        .hd-actions {
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        .btn-outline {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--font);
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--dim);
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: 4px;
+          padding: 8px 14px;
+          cursor: pointer;
+          transition: color 0.13s, border-color 0.13s, background 0.13s;
+          white-space: nowrap;
+        }
+
+        .btn-outline:hover {
+          color: var(--ink);
+          border-color: var(--muted);
+          background: var(--lift);
+        }
+
+        .btn-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--font);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #07101d;
+          background: var(--amber);
+          border: 1px solid var(--amber);
+          border-radius: 4px;
+          padding: 8px 16px;
+          cursor: pointer;
+          transition: opacity 0.13s, box-shadow 0.2s;
+          white-space: nowrap;
+          box-shadow: 0 0 0 0 var(--amb25);
+        }
+
+        .btn-primary:hover {
+          opacity: 0.88;
+          box-shadow: 0 0 20px var(--amb25);
+        }
+
+        /* ── KPI grid ──────────────────────────────────────── */
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+
+        @media (min-width: 768px)  { .kpi-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; } }
+
+        .kpi {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-top: 2px solid var(--a);
+          border-radius: 6px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          animation: up 0.5s ease both;
+          transition: transform 0.18s, box-shadow 0.18s;
+        }
+
+        .kpi:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 20px #0008;
+        }
+
+        .kpi-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .kpi-icon {
+          width: 32px; height: 32px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .kpi-delta {
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          color: #4ade80;
+        }
+
+        .kpi-val {
+          font-size: 24px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          color: var(--ink);
+          font-variant-numeric: tabular-nums;
+        }
+
+        @media (min-width: 640px) { .kpi-val { font-size: 28px; } }
+
+        .kpi-lbl {
+          font-size: 9px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--dim);
+        }
+
+        /* ── Content grids ─────────────────────────────────── */
+        .grid-a {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        @media (min-width: 1024px) {
+          .grid-a { grid-template-columns: 1fr 300px; }
+        }
+
+        .grid-b {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        @media (min-width: 768px) {
+          .grid-b { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (min-width: 1024px) {
+          .grid-b { grid-template-columns: 240px 1fr; }
+        }
+
+        /* ── Panel ─────────────────────────────────────────── */
+        .panel {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          overflow: hidden;
+          animation: up 0.5s 0.1s ease both;
+        }
+
+        .panel-hd {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: var(--dim);
+        }
+
+        .panel-cta {
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          font-family: var(--font);
+          font-size: 9px;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--muted);
+          background: none;
+          border: none;
+          cursor: pointer;
+          transition: color 0.12s;
+        }
+
+        .panel-cta:hover { color: var(--amber); }
+
+        /* ── Orders table ──────────────────────────────────── */
+        .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        table.t {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 480px;
+        }
+
+        table.t th {
+          padding: 9px 16px;
+          text-align: left;
+          font-size: 8.5px;
+          font-weight: 600;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: var(--muted);
+          border-bottom: 1px solid var(--border);
+          white-space: nowrap;
+        }
+
+        table.t td {
+          padding: 10px 16px;
+          border-bottom: 1px solid var(--line);
+          vertical-align: middle;
+        }
+
+        table.t tr:last-child td { border-bottom: none; }
+        table.t tbody tr { transition: background 0.1s; }
+        table.t tbody tr:hover { background: var(--lift); }
+
+        .t-inv { font-size: 10px; letter-spacing: 0.06em; color: var(--muted); }
+        .t-name { font-size: 11.5px; color: var(--ink); }
+
+        .t-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 8.5px;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          padding: 3px 8px;
+          border-radius: 3px;
+          border: 1px solid;
+        }
+
+        .t-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+        .t-amt { font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+        .t-del {
+          background: none; border: none;
+          cursor: pointer;
+          color: var(--border);
+          padding: 3px;
+          border-radius: 3px;
+          opacity: 0;
+          transition: color 0.12s, background 0.12s, opacity 0.12s;
+        }
+
+        tr:hover .t-del { opacity: 1; }
+        .t-del:hover { color: #f87171; background: #f8717114; }
+
+        /* ── Product rows ──────────────────────────────────── */
+        .p-row {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 11px 16px;
+          border-bottom: 1px solid var(--line);
+          transition: background 0.1s;
+        }
+
+        .p-row:last-child { border-bottom: none; }
+        .p-row:hover { background: var(--lift); }
+        .p-row:hover .p-arr { color: var(--amber); }
+
+        .p-thumb {
+          width: 36px; height: 36px;
+          border-radius: 5px;
+          background: var(--lift);
+          border: 1px solid var(--border);
+          flex-shrink: 0;
+          overflow: hidden;
+          display: flex; align-items: center; justify-content: center;
+        }
+
+        .p-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+        .p-info { flex: 1; min-width: 0; }
+
+        .p-name {
+          font-size: 11px;
+          color: var(--ink);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-bottom: 2px;
+        }
+
+        .p-price { font-size: 10px; color: var(--amber); letter-spacing: 0.04em; }
+        .p-arr { color: var(--line); flex-shrink: 0; transition: color 0.12s; }
+
+        /* ── Category chips ────────────────────────────────── */
+        .cat-wrap { padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+
+        .cat-chip {
+          font-family: var(--font);
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--dim);
+          background: var(--lift);
+          border: 1px solid var(--border);
+          padding: 5px 11px;
+          border-radius: 3px;
+          cursor: default;
+          transition: color 0.12s, border-color 0.12s, background 0.12s;
+        }
+
+        .cat-chip:hover {
+          color: var(--amber);
+          border-color: var(--amb25);
+          background: var(--amb10);
+        }
+
+        /* ── Quick actions ─────────────────────────────────── */
+        .qa {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 20px;
+          animation: up 0.5s 0.18s ease both;
+        }
+
+        .qa-lbl {
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: var(--dim);
+          margin-bottom: 4px;
+        }
+
+        .qa-title {
+          font-size: 18px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          color: var(--ink);
+          margin-bottom: 18px;
+        }
+
+        .qa-title span { color: var(--amber); }
+
+        .qa-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        @media (min-width: 480px) { .qa-grid { grid-template-columns: repeat(3, 1fr); } }
+
+        .qa-btn {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 13px 14px;
+          background: var(--lift);
+          border: 1px solid var(--border);
+          border-radius: 5px;
+          cursor: pointer;
+          text-align: left;
+          transition: border-color 0.14s, background 0.14s, transform 0.12s;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .qa-btn::after {
+          content: '';
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          height: 2px;
+          background: var(--q);
+          transform: scaleX(0);
+          transform-origin: left;
+          transition: transform 0.2s ease;
+        }
+
+        .qa-btn:hover {
+          border-color: color-mix(in srgb, var(--q) 40%, transparent);
+          transform: translateY(-1px);
+        }
+
+        .qa-btn:hover::after { transform: scaleX(1); }
+        .qa-btn:active { transform: scale(0.98); }
+
+        .qa-ico {
+          width: 30px; height: 30px;
+          border-radius: 6px;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .qa-name {
+          font-family: var(--font);
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          flex: 1;
+          text-align: left;
+        }
+
+        /* ── Skeletons ─────────────────────────────────────── */
+        .bone {
+          border-radius: 3px;
+          background: linear-gradient(90deg, var(--lift) 25%, var(--border) 50%, var(--lift) 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.8s ease infinite;
+        }
+
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        /* ── Empty ─────────────────────────────────────────── */
+        .empty-st {
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 8px; padding: 36px 20px;
+          color: var(--muted);
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        /* ── Scrollbar ─────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 3px; height: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--amb25); }
+
+        /* ── Animations ────────────────────────────────────── */
+        @keyframes up {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        {/* ── Header ── */}
-        <header className="mb-10 fade-up fade-up-1 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="pg-inner">
+        {/* ── Header ──────────────────────────────────────── */}
+        <header className="hd">
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-widest mb-1 font-medium">
-              Overview
-            </p>
-            <h1
-              className="text-4xl font-extrabold tracking-tight"
-              style={{ fontFamily: "'Syne', sans-serif" }}
-            >
-              Admin Dashboard
-            </h1>
+            <p className="hd-label">Overview</p>
+            <h1 className="hd-title">Admin Dashboard</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="hd-actions">
             <button
+              className="btn-outline"
               onClick={() => window.location.reload()}
-              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white border rounded-xl px-4 py-2.5 transition-all hover:bg-white/5"
-              style={{ borderColor: "rgba(255,255,255,0.1)" }}
             >
-              <RefreshCw size={13} /> Refresh
+              <RefreshCw size={11} /> Refresh
             </button>
             <button
+              className="btn-primary"
               onClick={() => navigate("/add-product")}
-              className="flex items-center gap-2 text-xs font-semibold text-black rounded-xl px-4 py-2.5 transition-all hover:opacity-90 active:scale-95"
-              style={{ background: "linear-gradient(135deg,#a78bfa,#818cf8)" }}
             >
-              <Plus size={13} /> New Product
+              <Plus size={11} /> New Product
             </button>
           </div>
         </header>
 
-        {/* ── KPI Grid ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8 fade-up fade-up-2">
-          {kpiData.map((k) => (
-            <KPICard key={k.title} {...k} />
+        {/* ── KPIs ────────────────────────────────────────── */}
+        <div className="kpi-grid">
+          {kpis.map((k, i) => (
+            <KPICard key={k.title} {...k} idx={i} />
           ))}
         </div>
 
-        {/* ── Middle Row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 fade-up fade-up-3">
-          {/* Recent Orders — spans 2 cols */}
-          <div className="lg:col-span-2">
-            <SectionCard
-              title="Recent Orders"
-              action="View all"
-              onAction={() => navigate("/order-list")}
-            >
-              {orderLoading ? (
-                <div className="p-6 flex flex-col gap-3">
-                  {[...Array(4)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : orders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-                  <AlertCircle size={28} />
-                  <p className="text-sm">No orders yet</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr
-                        className="text-left"
-                        style={{
-                          borderBottom: "1px solid rgba(255,255,255,0.06)",
-                        }}
-                      >
-                        {["Invoice", "Customer", "Status", "Amount", ""].map(
-                          (h) => (
-                            <th
-                              key={h}
-                              className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-widest"
-                            >
-                              {h}
-                            </th>
-                          ),
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orders.slice(0, 6).map((order, i) => (
-                        <tr
-                          key={order._id ?? i}
-                          className="group hover:bg-white/[0.02] transition-colors"
-                          style={{
-                            borderBottom: "1px solid rgba(255,255,255,0.04)",
-                          }}
-                        >
-                          <td className="px-6 py-3.5 text-slate-400 font-mono text-xs">
-                            #{order.invoiceID ?? order._id?.slice(-6)}
-                          </td>
-                          <td className="px-6 py-3.5 font-medium text-white">
-                            {order.customerName ?? order.user?.name ?? "—"}
-                          </td>
-                          <td className="px-6 py-3.5">
-                            <span
-                              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColor(order.status)}`}
-                            >
-                              {order.status ?? "Unknown"}
+        {/* ── Orders + Products ────────────────────────────── */}
+        <div className="grid-a">
+          <Panel
+            title="Recent Orders"
+            cta="View all"
+            onCta={() => navigate("/order-list")}
+          >
+            {orderLoading ? (
+              <BoneList n={6} h={34} />
+            ) : orders.length === 0 ? (
+              <Empty icon={AlertCircle} msg="No orders yet" />
+            ) : (
+              <div className="tbl-wrap">
+                <table className="t">
+                  <thead>
+                    <tr>
+                      {["Invoice", "Customer", "Status", "Amount", ""].map(
+                        (h) => (
+                          <th key={h}>{h}</th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.slice(0, 8).map((o, i) => {
+                      const sm = statusMeta(o.status);
+                      const oid = o.invoiceID ?? o._id;
+                      return (
+                        <tr key={o._id ?? i}>
+                          <td>
+                            <span className="t-inv">
+                              #{o.invoiceID ?? o._id?.slice(-6)}
                             </span>
                           </td>
-                          <td className="px-6 py-3.5 text-white font-semibold">
-                            $
-                            {parseFloat(
-                              order.totalAmount ?? 0,
-                            ).toLocaleString()}
+                          <td>
+                            <span className="t-name">
+                              {o.customerName ?? o.user?.name ?? "—"}
+                            </span>
                           </td>
-                          <td className="px-6 py-3.5">
-                            <button
-                              onClick={() =>
-                                handleDeleteOrder(order.invoiceID ?? order._id)
-                              }
-                              disabled={
-                                deletingId === (order.invoiceID ?? order._id)
-                              }
-                              className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-rose-400 transition-all"
+                          <td>
+                            <span
+                              className="t-pill"
+                              style={{
+                                color: sm.color,
+                                background: sm.bg,
+                                borderColor: sm.border,
+                              }}
                             >
-                              <Trash2 size={14} />
+                              <span className="t-dot" />
+                              {o.status ?? "Unknown"}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="t-amt" style={{ color: sm.color }}>
+                              ৳{parseFloat(o.totalAmount ?? 0).toLocaleString()}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="t-del"
+                              onClick={() => handleDelete(oid)}
+                              disabled={deletingId === oid}
+                            >
+                              <Trash2 size={12} />
                             </button>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </SectionCard>
-          </div>
-
-          {/* Recent Products */}
-          <SectionCard
-            title="Products"
-            action="Manage"
-            onAction={() => navigate("/products")}
-          >
-            {prodLoading ? (
-              <div className="p-6 flex flex-col gap-3">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-                <Package size={28} />
-                <p className="text-sm">No products yet</p>
-              </div>
-            ) : (
-              <div
-                className="flex flex-col divide-y"
-                style={{ divideColor: "rgba(255,255,255,0.04)" }}
-              >
-                {products.slice(0, 5).map((prod, i) => (
-                  <div
-                    key={prod._id ?? i}
-                    className="flex items-center gap-3 px-6 py-3.5 hover:bg-white/[0.02] transition-colors group"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-                  >
-                    <div
-                      className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden"
-                      style={{ background: "rgba(255,255,255,0.06)" }}
-                    >
-                      {prod.images?.[0] ? (
-                        <img
-                          src={prod.images[0]}
-                          alt={prod.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package size={14} className="text-slate-600" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">
-                        {prod.name}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        ${parseFloat(prod.price ?? 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <ArrowUpRight
-                      size={14}
-                      className="text-slate-700 group-hover:text-slate-400 transition-colors flex-shrink-0"
-                    />
-                  </div>
-                ))}
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
-          </SectionCard>
+          </Panel>
+
+          <Panel
+            title="Products"
+            cta="Manage"
+            onCta={() => navigate("/products")}
+          >
+            {prodLoading ? (
+              <BoneList n={5} h={46} />
+            ) : products.length === 0 ? (
+              <Empty icon={Package} msg="No products" />
+            ) : (
+              products.slice(0, 6).map((prod, i) => (
+                <div className="p-row" key={prod._id ?? i}>
+                  <div className="p-thumb">
+                    {prod.images?.[0] ? (
+                      <img src={prod.images[0]} alt={prod.name} />
+                    ) : (
+                      <Package size={12} style={{ color: "var(--muted)" }} />
+                    )}
+                  </div>
+                  <div className="p-info">
+                    <p className="p-name">{prod.name}</p>
+                    <p className="p-price">
+                      ৳{parseFloat(prod.price ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <ArrowUpRight size={12} className="p-arr" />
+                </div>
+              ))
+            )}
+          </Panel>
         </div>
 
-        {/* ── Bottom Row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-up fade-up-4">
-          {/* Categories */}
-          <SectionCard
+        {/* ── Categories + Quick Actions ────────────────────── */}
+        <div className="grid-b">
+          <Panel
             title="Categories"
-            action="Manage"
-            onAction={() => navigate("/add-category")}
+            cta="Manage"
+            onCta={() => navigate("/add-category")}
           >
             {catLoading ? (
-              <div className="p-6 flex flex-col gap-3">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
+              <BoneList n={4} h={26} />
             ) : categories.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
-                <LayoutGrid size={24} />
-                <p className="text-sm">No categories</p>
-              </div>
+              <Empty icon={LayoutGrid} msg="No categories" />
             ) : (
-              <div className="p-4 flex flex-wrap gap-2">
-                {categories.map((cat, i) => (
-                  <span
-                    key={cat._id ?? i}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full border text-slate-300 hover:text-white transition-colors cursor-default"
-                    style={{
-                      background: "rgba(255,255,255,0.04)",
-                      borderColor: "rgba(255,255,255,0.1)",
-                    }}
-                  >
-                    {cat.name}
+              <div className="cat-wrap">
+                {categories.map((c, i) => (
+                  <span className="cat-chip" key={c._id ?? i}>
+                    {c.name}
                   </span>
                 ))}
               </div>
             )}
-          </SectionCard>
+          </Panel>
 
-          {/* Quick Actions */}
-          <div
-            className="lg:col-span-2 rounded-2xl border p-6 flex flex-col justify-between gap-6"
-            style={{
-              background: "rgba(255,255,255,0.02)",
-              borderColor: "rgba(255,255,255,0.08)",
-            }}
-          >
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-1">
-                Quick Actions
-              </p>
-              <h3
-                className="text-xl font-bold"
-                style={{ fontFamily: "'Syne', sans-serif" }}
-              >
-                Jump right in
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="qa">
+            <p className="qa-lbl">Shortcuts</p>
+            <p className="qa-title">
+              Jump right <span>in</span>
+            </p>
+            <div className="qa-grid">
               {[
                 {
                   label: "Add Product",
                   icon: Plus,
                   route: "/add-product",
-                  accent: "#a78bfa",
+                  color: "#da7708",
                 },
                 {
                   label: "Add Category",
                   icon: LayoutGrid,
                   route: "/add-category",
-                  accent: "#fb923c",
+                  color: "#c084fc",
                 },
                 {
                   label: "View Orders",
                   icon: ListOrdered,
                   route: "/order-list",
-                  accent: "#38bdf8",
+                  color: "#60a5fa",
                 },
-              ].map(({ label, icon: Icon, route, accent }) => (
+              ].map(({ label, icon: Icon, route, color }) => (
                 <button
                   key={label}
+                  className="qa-btn"
                   onClick={() => navigate(route)}
-                  className="flex items-center gap-3 rounded-xl p-4 text-left transition-all hover:scale-[1.02] active:scale-[0.98] group border"
-                  style={{
-                    background: `${accent}0d`,
-                    borderColor: `${accent}22`,
-                  }}
+                  style={{ "--q": color }}
                 >
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: `${accent}22` }}
+                    className="qa-ico"
+                    style={{
+                      background: `${color}18`,
+                      border: `1px solid ${color}30`,
+                    }}
                   >
-                    <Icon size={16} style={{ color: accent }} />
+                    <Icon size={13} style={{ color }} />
                   </div>
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: accent }}
-                  >
+                  <span className="qa-name" style={{ color }}>
                     {label}
                   </span>
                   <ChevronRight
-                    size={14}
-                    className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ color: accent }}
+                    size={11}
+                    style={{ color, opacity: 0.5, flexShrink: 0 }}
                   />
                 </button>
               ))}
@@ -493,6 +896,4 @@ const Page = () => {
       </div>
     </div>
   );
-};
-
-export default Page;
+}

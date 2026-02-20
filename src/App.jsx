@@ -60,8 +60,6 @@ export default function App() {
           />
         </Routes>
       </Suspense>
-
-      <ThemeToggle />
     </BrowserRouter>
   );
 }
