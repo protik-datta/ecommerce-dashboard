@@ -15,7 +15,6 @@ import {
   Activity,
   CheckCircle2,
 } from "lucide-react";
-import adminImage from "../assets/admin.jpg";
 
 const BARS = [42, 68, 55, 80, 63, 91, 74, 58, 87, 70, 95, 82];
 const ALERTS = [
@@ -55,7 +54,7 @@ const AdminLogin = () => {
         JSON.stringify({
           name: "Admin",
           email: formData.email,
-          avatar: adminImage,
+          avatar: './default.jpg',
           token: "loggedin",
         }),
       );
